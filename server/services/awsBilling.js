@@ -31,20 +31,82 @@ function monthsAgo(n) {
   return d.toISOString().split('T')[0]
 }
 
+function dateFromMonthsAgo(n) {
+  const d = new Date()
+  d.setMonth(d.getMonth() - n)
+  d.setDate(1)
+  return d
+}
+
+// AWS Cost Explorer limits grouped queries to ~12 months per call
+// For longer ranges we split into 12-month chunks and combine
 async function getMonthlyCosts(credentials = null, months = 6) {
   const client = createClient(credentials)
-  const startDate = monthsAgo(months)
   const endDate = today()
+  const startDate = monthsAgo(months)
   console.log(`Fetching costs from ${startDate} to ${endDate} (${months} months)`)
 
-  const command = new GetCostAndUsageCommand({
-    TimePeriod: { Start: startDate, End: endDate },
-    Granularity: 'MONTHLY',
-    GroupBy: [{ Type: 'DIMENSION', Key: 'SERVICE' }],
-    Metrics: ['UnblendedCost']
+  // If 12 months or less, single call is fine
+  if (months <= 12) {
+    const command = new GetCostAndUsageCommand({
+      TimePeriod: { Start: startDate, End: endDate },
+      Granularity: 'MONTHLY',
+      GroupBy: [{ Type: 'DIMENSION', Key: 'SERVICE' }],
+      Metrics: ['UnblendedCost']
+    })
+    const res = await client.send(command)
+    return res.ResultsByTime
+  }
+
+  // For 13+ months, split into chunks of 12 months each
+  const chunks = []
+  let chunkEnd = new Date()
+  let remaining = months
+
+  while (remaining > 0) {
+    const chunkMonths = Math.min(remaining, 12)
+    const chunkStart = new Date(chunkEnd)
+    chunkStart.setMonth(chunkStart.getMonth() - chunkMonths)
+    chunkStart.setDate(1)
+
+    chunks.push({
+      start: chunkStart.toISOString().split('T')[0],
+      end: chunkEnd.toISOString().split('T')[0]
+    })
+
+    chunkEnd = new Date(chunkStart)
+    remaining -= chunkMonths
+  }
+
+  // Fetch all chunks in parallel
+  const results = await Promise.all(
+    chunks.map(chunk => {
+      const command = new GetCostAndUsageCommand({
+        TimePeriod: { Start: chunk.start, End: chunk.end },
+        Granularity: 'MONTHLY',
+        GroupBy: [{ Type: 'DIMENSION', Key: 'SERVICE' }],
+        Metrics: ['UnblendedCost']
+      })
+      return client.send(command).then(r => r.ResultsByTime)
+    })
+  )
+
+  // Combine and sort all results by date ascending
+  const combined = results.flat()
+  combined.sort((a, b) =>
+    new Date(a.TimePeriod.Start) - new Date(b.TimePeriod.Start)
+  )
+
+  // Remove duplicate months if any overlap occurred
+  const seen = new Set()
+  const deduplicated = combined.filter(period => {
+    const key = period.TimePeriod.Start
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
   })
-  const res = await client.send(command)
-  return res.ResultsByTime
+
+  return deduplicated
 }
 
 async function getDailyCosts(credentials = null) {
@@ -89,20 +151,39 @@ async function getCostForecast(credentials = null) {
 async function getBillingSummary(credentials = null) {
   try {
     const client = createClient(credentials)
-    const command = new GetCostAndUsageCommand({
-      TimePeriod: { Start: monthsAgo(36), End: today() },
-      Granularity: 'MONTHLY',
-      Metrics: ['UnblendedCost']
-    })
-    const res = await client.send(command)
+
+    // Get last 36 months in two 18-month chunks
+    const now = today()
+    const mid = monthsAgo(18)
+    const start = monthsAgo(36)
+
+    const [res1, res2] = await Promise.all([
+      client.send(new GetCostAndUsageCommand({
+        TimePeriod: { Start: start, End: mid },
+        Granularity: 'MONTHLY',
+        Metrics: ['UnblendedCost']
+      })),
+      client.send(new GetCostAndUsageCommand({
+        TimePeriod: { Start: mid, End: now },
+        Granularity: 'MONTHLY',
+        Metrics: ['UnblendedCost']
+      }))
+    ])
+
+    const allPeriods = [
+      ...res1.ResultsByTime,
+      ...res2.ResultsByTime
+    ].sort((a, b) =>
+      new Date(a.TimePeriod.Start) - new Date(b.TimePeriod.Start)
+    )
 
     let totalPaid = 0
     let currentMonthAmount = 0
     const monthlyTotals = []
 
-    res.ResultsByTime.forEach((period, index) => {
+    allPeriods.forEach((period, index) => {
       const amount = parseFloat(period.Total?.UnblendedCost?.Amount || 0)
-      const isCurrentMonth = index === res.ResultsByTime.length - 1
+      const isCurrentMonth = index === allPeriods.length - 1
       if (isCurrentMonth) {
         currentMonthAmount = amount
       } else {
