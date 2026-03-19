@@ -2,36 +2,6 @@ const express = require('express')
 const router = express.Router()
 const { getMonthlyCosts, getDailyCosts, getCostForecast } = require('../services/awsBilling')
 
-router.get('/monthly', async (req, res) => {
-  try {
-    const credentials = extractCredentials(req)
-    const data = await getMonthlyCosts(credentials)
-    res.json({ success: true, data })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
-  }
-})
-
-router.get('/daily', async (req, res) => {
-  try {
-    const credentials = extractCredentials(req)
-    const data = await getDailyCosts(credentials)
-    res.json({ success: true, data })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
-  }
-})
-
-router.get('/forecast', async (req, res) => {
-  try {
-    const credentials = extractCredentials(req)
-    const data = await getCostForecast(credentials)
-    res.json({ success: true, data })
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message })
-  }
-})
-
 function extractCredentials(req) {
   const accessKeyId = req.headers['x-aws-access-key-id']
   const secretAccessKey = req.headers['x-aws-secret-access-key']
@@ -41,5 +11,50 @@ function extractCredentials(req) {
   }
   return null
 }
+
+router.get('/monthly', async (req, res) => {
+  try {
+    const credentials = extractCredentials(req)
+    const data = await getMonthlyCosts(credentials)
+    res.json({ success: true, data })
+  } catch (err) {
+    console.error('Monthly error:', err.name, err.message)
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      errorType: err.name
+    })
+  }
+})
+
+router.get('/daily', async (req, res) => {
+  try {
+    const credentials = extractCredentials(req)
+    const data = await getDailyCosts(credentials)
+    res.json({ success: true, data })
+  } catch (err) {
+    console.error('Daily error:', err.name, err.message)
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      errorType: err.name
+    })
+  }
+})
+
+router.get('/forecast', async (req, res) => {
+  try {
+    const credentials = extractCredentials(req)
+    const data = await getCostForecast(credentials)
+    res.json({ success: true, data })
+  } catch (err) {
+    console.error('Forecast error:', err.name, err.message)
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      errorType: err.name
+    })
+  }
+})
 
 module.exports = router
