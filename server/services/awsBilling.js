@@ -55,17 +55,35 @@ async function getDailyCosts(credentials = null) {
 }
 
 async function getCostForecast(credentials = null) {
-  const client = createClient(credentials)
-  const now = new Date()
-  const endOfMonth = new Date(now.getFullYear(),
-    now.getMonth() + 1, 1).toISOString().split('T')[0]
-  const command = new GetCostForecastCommand({
-    TimePeriod: { Start: today(), End: endOfMonth },
-    Granularity: 'MONTHLY',
-    Metric: 'UNBLENDED_COST'
-  })
-  const res = await client.send(command)
-  return res.Total
+  try {
+    const client = createClient(credentials)
+    const now = new Date()
+    const tomorrow = new Date(now)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const endOfMonth = new Date(now.getFullYear(),
+      now.getMonth() + 1, 1)
+
+    // Need at least 1 day gap between start and end
+    if (tomorrow >= endOfMonth) {
+      return { Amount: '0', Unit: 'USD', note: 'End of month reached' }
+    }
+
+    const command = new GetCostForecastCommand({
+      TimePeriod: {
+        Start: tomorrow.toISOString().split('T')[0],
+        End: endOfMonth.toISOString().split('T')[0]
+      },
+      Granularity: 'MONTHLY',
+      Metric: 'UNBLENDED_COST'
+    })
+    const res = await client.send(command)
+    return res.Total
+  } catch (err) {
+    // Return zero forecast instead of crashing
+    // when there is not enough billing history
+    console.warn('Forecast unavailable:', err.message)
+    return { Amount: '0', Unit: 'USD', note: err.message }
+  }
 }
 
 module.exports = { getMonthlyCosts, getDailyCosts, getCostForecast }
