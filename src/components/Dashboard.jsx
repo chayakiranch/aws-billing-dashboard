@@ -13,10 +13,11 @@ import ConnectModal from './ConnectModal'
 export default function Dashboard() {
   const [showModal, setShowModal] = useState(false)
   const [credentials, setCredentials] = useState(null)
-  const [accountId, setAccountId] = useState('123456789012')
+  const [accountId, setAccountId] = useState(null)
   const [months, setMonths] = useState(6)
 
-  const { monthly, daily, forecast, summary, loading, error } =
+  const { monthly, daily, forecast, summary,
+          loading, error, isDemo } =
     useBillingData(credentials, months)
 
   const handleConnect = (creds) => {
@@ -27,6 +28,11 @@ export default function Dashboard() {
     })
     setAccountId(creds.accountId || creds.accessKeyId.slice(0, 12))
     setShowModal(false)
+  }
+
+  const handleDisconnect = () => {
+    setCredentials(null)
+    setAccountId(null)
   }
 
   if (loading) {
@@ -71,14 +77,23 @@ export default function Dashboard() {
               <li>• Backend server not running</li>
             </ul>
           </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500
-                       rounded-lg text-white text-sm
-                       font-semibold transition"
-          >
-            Try Different Credentials
-          </button>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={handleDisconnect}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600
+                         rounded-lg text-white text-sm transition"
+            >
+              Back to Demo
+            </button>
+            <button
+              onClick={() => setShowModal(true)}
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-500
+                         rounded-lg text-white text-sm
+                         font-semibold transition"
+            >
+              Try Different Credentials
+            </button>
+          </div>
         </div>
         {showModal && (
           <ConnectModal
@@ -108,48 +123,94 @@ export default function Dashboard() {
               Billing & Cost Management
             </h1>
             <p className="text-gray-500 text-xs flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-green-400 rounded-full
-                               inline-block animate-pulse" />
-              Live · refreshed just now
+              {isDemo ? (
+                <>
+                  <span className="w-1.5 h-1.5 bg-amber-400
+                                   rounded-full inline-block" />
+                  Demo mode · connect your account for real data
+                </>
+              ) : (
+                <>
+                  <span className="w-1.5 h-1.5 bg-green-400
+                                   rounded-full inline-block
+                                   animate-pulse" />
+                  Live · refreshed just now
+                </>
+              )}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="bg-gray-800 border border-gray-700
-                          rounded-lg px-3 py-1.5 text-xs
-                          font-mono text-gray-400 hidden sm:block">
-            Account: <span className="text-blue-400">{accountId}</span>
-          </div>
-          <div className="bg-gray-800 border border-gray-700
-                          rounded-lg px-3 py-1.5 text-xs
-                          font-mono text-gray-400 hidden sm:block">
-            Region: <span className="text-blue-400">us-east-1</span>
-          </div>
+          {!isDemo && accountId && (
+            <>
+              <div className="bg-gray-800 border border-gray-700
+                              rounded-lg px-3 py-1.5 text-xs
+                              font-mono text-gray-400 hidden sm:block">
+                Account: <span className="text-blue-400">
+                  {accountId}
+                </span>
+              </div>
+              <div className="bg-gray-800 border border-gray-700
+                              rounded-lg px-3 py-1.5 text-xs
+                              font-mono text-gray-400 hidden sm:block">
+                Region: <span className="text-blue-400">us-east-1</span>
+              </div>
+              <button
+                onClick={handleDisconnect}
+                className="px-3 py-2 bg-gray-700 hover:bg-gray-600
+                           text-gray-300 rounded-lg text-xs
+                           font-medium transition"
+              >
+                Disconnect
+              </button>
+            </>
+          )}
           <button
             onClick={() => setShowModal(true)}
             className="px-4 py-2 bg-blue-500 hover:bg-blue-400
                        text-white rounded-lg text-xs
                        font-semibold transition"
           >
-            {credentials ? 'Switch Account' : 'Connect Account'}
+            {isDemo ? 'Connect Account' : 'Switch Account'}
           </button>
         </div>
       </header>
 
+      {/* Demo banner */}
+      {isDemo && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20
+                        px-6 py-2.5 flex items-center
+                        justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-amber-400 text-xs font-medium">
+              Demo Mode
+            </span>
+            <span className="text-amber-500/70 text-xs">
+              — Showing sample data. Connect your AWS account
+              to see real billing information.
+            </span>
+          </div>
+          <button
+            onClick={() => setShowModal(true)}
+            className="text-xs text-amber-400 hover:text-amber-300
+                       underline transition flex-shrink-0 ml-4"
+          >
+            Connect now
+          </button>
+        </div>
+      )}
+
       {/* Main */}
       <main className="p-6 space-y-6 max-w-screen-2xl mx-auto">
 
-        {/* Row 1 — KPI cards */}
         <MetricsRow monthly={monthly} forecast={forecast} />
 
-        {/* Row 2 — Trend chart + Donut */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <TrendChart
               monthly={monthly}
               onRangeChange={(newMonths) => {
-                console.log('Range changed to', newMonths, 'months')
-                setMonths(newMonths)
+                if (!isDemo) setMonths(newMonths)
               }}
             />
           </div>
@@ -158,7 +219,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Row 3 — Service table + Forecast + Sparkline */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <ServiceTable monthly={monthly} />
@@ -169,10 +229,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Row 4 — Billing Summary full width */}
         <BillingSummary summary={summary} />
-
-        {/* Row 5 — Heatmap full width */}
         <HeatMap />
 
       </main>
