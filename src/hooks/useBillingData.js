@@ -22,18 +22,28 @@ export function useBillingData(credentials = null, months = 6) {
       setLoading(true)
       setError(null)
       try {
-        const [monthlyRes, dailyRes, forecastRes, summaryRes] =
-          await Promise.all([
-            axios.get(`${API_BASE}/api/billing/monthly?months=${months}`,
-              { headers }),
-            axios.get(`${API_BASE}/api/billing/daily`, { headers }),
-            axios.get(`${API_BASE}/api/billing/forecast`, { headers }),
-            axios.get(`${API_BASE}/api/billing/summary`, { headers })
-          ])
+        // Fetch monthly, daily, forecast together — these are critical
+        const [monthlyRes, dailyRes, forecastRes] = await Promise.all([
+          axios.get(`${API_BASE}/api/billing/monthly?months=${months}`,
+            { headers }),
+          axios.get(`${API_BASE}/api/billing/daily`, { headers }),
+          axios.get(`${API_BASE}/api/billing/forecast`, { headers })
+        ])
         setMonthly(monthlyRes.data.data)
         setDaily(dailyRes.data.data)
         setForecast(forecastRes.data.data)
-        setSummary(summaryRes.data.data)
+
+        // Fetch summary separately — non-critical, won't crash dashboard
+        try {
+          const summaryRes = await axios.get(
+            `${API_BASE}/api/billing/summary`, { headers }
+          )
+          setSummary(summaryRes.data.data)
+        } catch (summaryErr) {
+          console.warn('Summary not available yet:', summaryErr.message)
+          setSummary(null)
+        }
+
       } catch (err) {
         setError(err.message)
       } finally {
