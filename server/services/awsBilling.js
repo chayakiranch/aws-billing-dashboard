@@ -33,8 +33,12 @@ function monthsAgo(n) {
 
 async function getMonthlyCosts(credentials = null, months = 6) {
   const client = createClient(credentials)
+  const startDate = monthsAgo(months)
+  const endDate = today()
+  console.log(`Fetching costs from ${startDate} to ${endDate} (${months} months)`)
+
   const command = new GetCostAndUsageCommand({
-    TimePeriod: { Start: monthsAgo(months), End: today() },
+    TimePeriod: { Start: startDate, End: endDate },
     Granularity: 'MONTHLY',
     GroupBy: [{ Type: 'DIMENSION', Key: 'SERVICE' }],
     Metrics: ['UnblendedCost']
@@ -61,9 +65,11 @@ async function getCostForecast(credentials = null) {
     const tomorrow = new Date(now)
     tomorrow.setDate(tomorrow.getDate() + 1)
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+
     if (tomorrow >= endOfMonth) {
       return { Amount: '0', Unit: 'USD' }
     }
+
     const command = new GetCostForecastCommand({
       TimePeriod: {
         Start: tomorrow.toISOString().split('T')[0],
@@ -80,28 +86,23 @@ async function getCostForecast(credentials = null) {
   }
 }
 
-// Get billing summary — total paid and any open/due amounts
 async function getBillingSummary(credentials = null) {
   try {
     const client = createClient(credentials)
-
-    // Get all time total (last 36 months)
-    const allTimeCommand = new GetCostAndUsageCommand({
+    const command = new GetCostAndUsageCommand({
       TimePeriod: { Start: monthsAgo(36), End: today() },
       Granularity: 'MONTHLY',
-      Metrics: ['UnblendedCost', 'BlendedCost']
+      Metrics: ['UnblendedCost']
     })
-    const allTimeRes = await client.send(allTimeCommand)
+    const res = await client.send(command)
 
     let totalPaid = 0
     let currentMonthAmount = 0
     const monthlyTotals = []
 
-    allTimeRes.ResultsByTime.forEach((period, index) => {
-      const amount = parseFloat(
-        period.Total?.UnblendedCost?.Amount || 0
-      )
-      const isCurrentMonth = index === allTimeRes.ResultsByTime.length - 1
+    res.ResultsByTime.forEach((period, index) => {
+      const amount = parseFloat(period.Total?.UnblendedCost?.Amount || 0)
+      const isCurrentMonth = index === res.ResultsByTime.length - 1
       if (isCurrentMonth) {
         currentMonthAmount = amount
       } else {

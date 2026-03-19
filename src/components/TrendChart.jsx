@@ -7,7 +7,7 @@ const COLORS = [
 ]
 
 const RANGE_OPTIONS = [
-  { label: '6 months', months: 6 },
+  { label: '6 months', months: 6  },
   { label: '1 year',   months: 12 },
   { label: '2 years',  months: 24 },
   { label: '3 years',  months: 36 },
@@ -17,9 +17,12 @@ export default function TrendChart({ monthly, onRangeChange }) {
   const [chartType, setChartType] = useState('bar')
   const [activeRange, setActiveRange] = useState(6)
 
-  const handleRangeChange = (months) => {
-    setActiveRange(months)
-    onRangeChange(months)
+  const handleRangeChange = (newMonths) => {
+    setActiveRange(newMonths)
+    if (onRangeChange) {
+      console.log('Range changed to', newMonths, 'months')
+      onRangeChange(newMonths)
+    }
   }
 
   if (!monthly || monthly.length === 0) {
@@ -53,7 +56,8 @@ export default function TrendChart({ monthly, onRangeChange }) {
     backgroundColor: chartType === 'line'
       ? 'rgba(56,189,248,0.08)'
       : totals.map((_, i) =>
-          i === totals.length - 1 ? '#38bdf8' : '#38bdf844'),
+          i === totals.length - 1 ? '#38bdf8' : '#38bdf844'
+        ),
     borderColor: '#38bdf8',
     borderWidth: 2,
     pointRadius: chartType === 'line' ? 3 : 0,
@@ -102,7 +106,7 @@ export default function TrendChart({ monthly, onRangeChange }) {
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
 
-      {/* Header row */}
+      {/* Top row — title + chart type tabs */}
       <div className="flex items-center justify-between mb-3">
         <div>
           <h2 className="text-sm font-semibold text-white">
@@ -129,8 +133,8 @@ export default function TrendChart({ monthly, onRangeChange }) {
         </div>
       </div>
 
-      {/* Range selector */}
-      <div className="flex gap-1 mb-4">
+      {/* Range selector pills */}
+      <div className="flex gap-2 mb-4">
         {RANGE_OPTIONS.map(({ label, months }) => (
           <button
             key={months}
@@ -146,6 +150,7 @@ export default function TrendChart({ monthly, onRangeChange }) {
         ))}
       </div>
 
+      {/* Chart */}
       <div className="h-56">
         <ChartComponent
           key={`${chartType}-${activeRange}`}

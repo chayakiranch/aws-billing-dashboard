@@ -21,6 +21,7 @@ router.get('/monthly', async (req, res) => {
   try {
     const credentials = extractCredentials(req)
     const months = parseInt(req.query.months) || 6
+    console.log(`Monthly route called with months=${months}`)
     const data = await getMonthlyCosts(credentials, months)
     res.json({ success: true, data })
   } catch (err) {

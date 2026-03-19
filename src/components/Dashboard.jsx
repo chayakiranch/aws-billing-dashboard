@@ -31,7 +31,8 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-950">
+      <div className="flex items-center justify-center
+                      h-screen bg-gray-950">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-blue-400
                           border-t-transparent rounded-full
@@ -57,14 +58,26 @@ export default function Dashboard() {
           <p className="text-white font-semibold text-lg mb-2">
             Connection Error
           </p>
-          <p className="text-gray-400 text-sm mb-4">{error}</p>
+          <p className="text-gray-400 text-sm mb-3">{error}</p>
+          <div className="bg-gray-900 border border-gray-700
+                          rounded-lg p-4 mb-4 text-left">
+            <p className="text-xs text-gray-400 font-medium mb-2">
+              Common causes:
+            </p>
+            <ul className="text-xs text-gray-500 space-y-1.5">
+              <li>• Wrong Access Key ID or Secret Key</li>
+              <li>• IAM user missing ce:GetCostAndUsage permission</li>
+              <li>• Cost Explorer not enabled in AWS Billing console</li>
+              <li>• Backend server not running</li>
+            </ul>
+          </div>
           <button
             onClick={() => setShowModal(true)}
             className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500
                        rounded-lg text-white text-sm
                        font-semibold transition"
           >
-            Connect AWS Account
+            Try Different Credentials
           </button>
         </div>
         {showModal && (
@@ -80,6 +93,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-950">
 
+      {/* Header */}
       <header className="bg-gray-900 border-b border-gray-800
                          px-6 py-4 flex items-center
                          justify-between sticky top-0 z-10">
@@ -122,16 +136,21 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {/* Main */}
       <main className="p-6 space-y-6 max-w-screen-2xl mx-auto">
 
+        {/* Row 1 — KPI cards */}
         <MetricsRow monthly={monthly} forecast={forecast} />
 
-        {/* Trend + Donut */}
+        {/* Row 2 — Trend chart + Donut */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <TrendChart
               monthly={monthly}
-              onRangeChange={setMonths}
+              onRangeChange={(newMonths) => {
+                console.log('Range changed to', newMonths, 'months')
+                setMonths(newMonths)
+              }}
             />
           </div>
           <div>
@@ -139,7 +158,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Service Table + Forecast + Sparkline */}
+        {/* Row 3 — Service table + Forecast + Sparkline */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <ServiceTable monthly={monthly} />
@@ -150,10 +169,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Billing Summary — full width */}
+        {/* Row 4 — Billing Summary full width */}
         <BillingSummary summary={summary} />
 
-        {/* Heatmap — full width */}
+        {/* Row 5 — Heatmap full width */}
         <HeatMap />
 
       </main>
