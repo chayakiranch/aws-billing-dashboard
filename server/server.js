@@ -2,22 +2,15 @@ require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
 const billingRoutes = require('./routes/billing')
+const performanceRoutes = require('./routes/performance')   // ← NEW
 
 const app = express()
 
 app.use(cors({
   origin: (origin, callback) => {
-    const allowed = [
-      'http://localhost:5173',
-      'http://localhost:4173',
-    ]
-
-    // Allow any vercel.app subdomain
+    const allowed = ['http://localhost:5173', 'http://localhost:4173']
     const isVercel = origin && origin.endsWith('.vercel.app')
-
-    // Allow specific custom domain if set
     const isCustom = origin && origin === process.env.FRONTEND_URL
-
     if (!origin || allowed.includes(origin) || isVercel || isCustom) {
       callback(null, true)
     } else {
@@ -29,17 +22,13 @@ app.use(cors({
 }))
 
 app.use(express.json())
+
 app.use('/api/billing', billingRoutes)
+app.use('/api/performance', performanceRoutes)   // ← NEW
 
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    message: 'All vercel.app origins allowed'
-  })
+  res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
 const PORT = process.env.PORT || 3001
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
-})
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
