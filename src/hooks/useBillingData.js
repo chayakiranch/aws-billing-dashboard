@@ -3,7 +3,7 @@ import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
-// ── Generate mock monthly data dynamically for any number of months ──
+// ── Generate mock monthly data dynamically for any number of months ───
 function generateMockMonthly(months) {
   const services = [
     { name: 'Amazon EC2',        base: 1800, variance: 600 },
@@ -15,7 +15,6 @@ function generateMockMonthly(months) {
     { name: 'AWS CloudWatch',    base: 50,   variance: 20  },
   ]
 
-  // Use a seeded-style approach so values are consistent per month
   function seededRand(seed) {
     const x = Math.sin(seed + 1) * 10000
     return x - Math.floor(x)
@@ -27,15 +26,15 @@ function generateMockMonthly(months) {
     d.setDate(1)
     d.setMonth(d.getMonth() - i)
     const monthKey = d.toISOString().split('T')[0]
-    const seed = d.getMonth() + d.getFullYear() * 12
+    const seed     = d.getMonth() + d.getFullYear() * 12
 
     result.push({
       TimePeriod: { Start: monthKey },
       Groups: services.map((svc, si) => {
-        const rand = seededRand(seed + si * 7)
+        const rand   = seededRand(seed + si * 7)
         const amount = (svc.base + rand * svc.variance).toFixed(2)
         return {
-          Keys: [svc.name],
+          Keys:    [svc.name],
           Metrics: { UnblendedCost: { Amount: amount } }
         }
       })
@@ -44,7 +43,7 @@ function generateMockMonthly(months) {
   return result
 }
 
-// ── Generate mock daily data (always last 30 days) ──
+// ── Generate mock daily data (always last 30 days) ────────────────────
 function generateMockDaily() {
   return Array.from({ length: 30 }, (_, i) => {
     const d = new Date()
@@ -57,7 +56,7 @@ function generateMockDaily() {
   })
 }
 
-// ── Generate mock summary from monthly data ──
+// ── Generate mock summary from monthly data ───────────────────────────
 function generateMockSummary(monthly) {
   return {
     totalPaid: '52840.50',
@@ -66,7 +65,7 @@ function generateMockSummary(monthly) {
       .toFixed(2) || '3199.40',
     currency: 'USD',
     monthlyTotals: monthly.map((m, i) => ({
-      month: m.TimePeriod.Start,
+      month:  m.TimePeriod.Start,
       amount: m.Groups.reduce((sum, g) =>
         sum + parseFloat(g.Metrics.UnblendedCost.Amount), 0),
       isPaid: i < monthly.length - 1
@@ -74,9 +73,36 @@ function generateMockSummary(monthly) {
   }
 }
 
-const MOCK_FORECAST = { Amount: '6340.00', Unit: 'USD' }
-const MOCK_DAILY    = generateMockDaily()
+// ── Mock forecast — matches the NEW rich shape from the backend ────────
+const now = new Date()
+const MOCK_FORECAST = {
+  endOfMonth: {
+    mean: 4180.00,
+    low:  3553.00,
+    high: 4807.00,
+  },
+  threeMonths: {
+    mean: 11400.00,
+    low:  9690.00,
+    high: 13110.00,
+  },
+  sixMonths: {
+    mean: 22800.00,
+    low:  19380.00,
+    high: 26220.00,
+  },
+  meta: {
+    daysInMonth:   new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(),
+    dayOfMonth:    now.getDate(),
+    daysRemaining: new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate(),
+    daysElapsed:   now.getDate() - 1,
+    generatedAt:   now.toISOString(),
+  }
+}
 
+const MOCK_DAILY = generateMockDaily()
+
+// ── Main hook ─────────────────────────────────────────────────────────
 export function useBillingData(credentials = null, months = 6) {
   const [monthly,  setMonthly]  = useState(() => generateMockMonthly(6))
   const [daily,    setDaily]    = useState(MOCK_DAILY)
@@ -93,7 +119,7 @@ export function useBillingData(credentials = null, months = 6) {
   } : {}
 
   useEffect(() => {
-    // ── DEMO MODE: no credentials, generate data for selected months ──
+    // ── DEMO MODE: generate data for selected month range ─────────────
     if (!credentials) {
       const mockMonthly = generateMockMonthly(months)
       setMonthly(mockMonthly)
@@ -106,7 +132,7 @@ export function useBillingData(credentials = null, months = 6) {
       return
     }
 
-    // ── LIVE MODE: credentials provided, fetch real data ──
+    // ── LIVE MODE: fetch real AWS data ────────────────────────────────
     async function fetchReal() {
       setLoading(true)
       setError(null)
@@ -120,7 +146,7 @@ export function useBillingData(credentials = null, months = 6) {
         ])
         setMonthly(monthlyRes.data.data)
         setDaily(dailyRes.data.data)
-        setForecast(forecastRes.data.data)
+        setForecast(forecastRes.data.data)   // now receives rich forecast object
 
         try {
           const summaryRes = await axios.get(`${API_BASE}/api/billing/summary`, { headers })
