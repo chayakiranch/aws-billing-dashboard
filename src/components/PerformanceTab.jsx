@@ -20,7 +20,9 @@ function formatBytes(bytes) {
 }
 
 function MiniLineChart({ data, color }) {
-  if (!data || data.length === 0) return <div className="h-16 flex items-center justify-center text-gray-600 text-xs">No data</div>
+  if (!data || data.length === 0) return (
+    <div className="h-16 flex items-center justify-center text-gray-600 text-xs">No data</div>
+  )
 
   const chartData = {
     labels: data.map(d => d.date.slice(5)),
@@ -39,10 +41,7 @@ function MiniLineChart({ data, color }) {
     responsive: true,
     maintainAspectRatio: false,
     plugins: { legend: { display: false }, tooltip: { enabled: true } },
-    scales: {
-      x: { display: false },
-      y: { display: false }
-    }
+    scales: { x: { display: false }, y: { display: false } }
   }
 
   return (
@@ -69,7 +68,10 @@ function InstanceCard({ instance }) {
             {instance.status}
           </span>
           <span className="text-xs text-gray-500">{instance.type}</span>
-          <button onClick={() => setExpanded(!expanded)} className="text-gray-500 hover:text-gray-300 text-xs">
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-gray-500 hover:text-gray-300 text-xs px-1"
+          >
             {expanded ? '▲' : '▼'}
           </button>
         </div>
@@ -80,8 +82,13 @@ function InstanceCard({ instance }) {
           <p className="text-xs text-gray-500 mb-1">Avg CPU</p>
           <p className={`text-lg font-mono font-semibold ${s.text}`}>{instance.avgCpu}%</p>
           <div className="w-full bg-gray-800 rounded-full h-1 mt-2">
-            <div className={`h-1 rounded-full transition-all ${instance.avgCpu > 40 ? 'bg-red-400' : instance.avgCpu > 5 ? 'bg-green-400' : 'bg-blue-400'}`}
-              style={{ width: `${Math.min(instance.avgCpu, 100)}%` }} />
+            <div
+              className={`h-1 rounded-full transition-all ${
+                instance.avgCpu > 40 ? 'bg-red-400' :
+                instance.avgCpu > 5  ? 'bg-green-400' : 'bg-blue-400'
+              }`}
+              style={{ width: `${Math.min(instance.avgCpu, 100)}%` }}
+            />
           </div>
         </div>
         <div className="bg-gray-900/50 rounded-lg p-3">
@@ -90,8 +97,8 @@ function InstanceCard({ instance }) {
             {instance.metrics?.networkIn?.length
               ? formatBytes(instance.metrics.networkIn.reduce((s, p) => s + p.value, 0) / instance.metrics.networkIn.length)
               : 'N/A'}
-            <span className="text-xs text-gray-500">/day avg</span>
           </p>
+          <p className="text-xs text-gray-600 mt-0.5">per day avg</p>
         </div>
         <div className="bg-gray-900/50 rounded-lg p-3">
           <p className="text-xs text-gray-500 mb-1">Network Out</p>
@@ -99,8 +106,8 @@ function InstanceCard({ instance }) {
             {instance.metrics?.networkOut?.length
               ? formatBytes(instance.metrics.networkOut.reduce((s, p) => s + p.value, 0) / instance.metrics.networkOut.length)
               : 'N/A'}
-            <span className="text-xs text-gray-500">/day avg</span>
           </p>
+          <p className="text-xs text-gray-600 mt-0.5">per day avg</p>
         </div>
       </div>
 
@@ -112,12 +119,18 @@ function InstanceCard({ instance }) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <p className="text-xs text-gray-500 mb-1">Network In</p>
-              <MiniLineChart data={instance.metrics?.networkIn?.map(d => ({ ...d, value: d.value / 1024 / 1024 }))} color="#60a5fa" />
+              <p className="text-xs text-gray-500 mb-1">Network In (MB)</p>
+              <MiniLineChart
+                data={instance.metrics?.networkIn?.map(d => ({ ...d, value: parseFloat((d.value / 1024 / 1024).toFixed(2)) }))}
+                color="#60a5fa"
+              />
             </div>
             <div>
-              <p className="text-xs text-gray-500 mb-1">Network Out</p>
-              <MiniLineChart data={instance.metrics?.networkOut?.map(d => ({ ...d, value: d.value / 1024 / 1024 }))} color="#f59e0b" />
+              <p className="text-xs text-gray-500 mb-1">Network Out (MB)</p>
+              <MiniLineChart
+                data={instance.metrics?.networkOut?.map(d => ({ ...d, value: parseFloat((d.value / 1024 / 1024).toFixed(2)) }))}
+                color="#f59e0b"
+              />
             </div>
           </div>
         </div>
@@ -128,9 +141,11 @@ function InstanceCard({ instance }) {
 
 export default function PerformanceTab() {
   const [instances, setInstances] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [demoMode, setDemoMode] = useState(false)
+  const [loading,   setLoading]   = useState(true)
+  const [error,     setError]     = useState(null)
+
+  // ── FIX: start in demo mode by default so data loads immediately ──
+  const [demoMode, setDemoMode] = useState(true)
 
   useEffect(() => {
     fetchPerformance()
@@ -150,12 +165,13 @@ export default function PerformanceTab() {
     }
   }
 
-  const idleCount  = instances.filter(i => i.status === 'idle').length
+  const idleCount   = instances.filter(i => i.status === 'idle').length
   const normalCount = instances.filter(i => i.status === 'normal').length
-  const highCount  = instances.filter(i => i.status === 'high').length
+  const highCount   = instances.filter(i => i.status === 'high').length
 
   return (
     <div className="space-y-4">
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -163,18 +179,26 @@ export default function PerformanceTab() {
           <p className="text-gray-500 text-xs">EC2 CPU &amp; network metrics via CloudWatch — last 7 days</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => setDemoMode(!demoMode)}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${demoMode ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'border-gray-700 text-gray-400 hover:border-gray-600'}`}>
+          <button
+            onClick={() => setDemoMode(!demoMode)}
+            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+              demoMode
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                : 'bg-teal-500/10 border-teal-500/30 text-teal-400'
+            }`}
+          >
             {demoMode ? 'Demo mode' : 'Live mode'}
           </button>
-          <button onClick={fetchPerformance}
-            className="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:border-gray-600">
+          <button
+            onClick={fetchPerformance}
+            className="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:border-gray-600 transition-colors"
+          >
             Refresh
           </button>
         </div>
       </div>
 
-      {/* Summary row */}
+      {/* Summary cards */}
       {!loading && !error && instances.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3">
@@ -195,31 +219,44 @@ export default function PerformanceTab() {
         </div>
       )}
 
-      {/* States */}
+      {/* Loading state */}
       {loading && (
-        <div className="flex items-center justify-center h-40 text-gray-500 text-sm">
-          Fetching CloudWatch metrics...
+        <div className="flex items-center justify-center h-40 gap-3">
+          <div className="w-5 h-5 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
+          <span className="text-gray-500 text-sm">Fetching CloudWatch metrics...</span>
         </div>
       )}
-      {error && (
+
+      {/* Error state */}
+      {!loading && error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400 text-sm">
           <p className="font-medium mb-1">Error fetching metrics</p>
-          <p className="text-xs text-red-300/70">{error}</p>
-          <button onClick={() => setDemoMode(true)} className="mt-2 text-xs underline">Switch to demo mode</button>
+          <p className="text-xs text-red-300/70 mb-2">{error}</p>
+          <button
+            onClick={() => setDemoMode(true)}
+            className="text-xs underline hover:text-red-300"
+          >
+            Switch to demo mode
+          </button>
         </div>
       )}
+
+      {/* Empty state */}
       {!loading && !error && instances.length === 0 && (
         <div className="text-center py-12 text-gray-500 text-sm">
-          No running EC2 instances found in {import.meta.env.VITE_AWS_REGION || 'us-east-1'}.
+          No running EC2 instances found.
         </div>
       )}
 
       {/* Instance cards */}
-      {!loading && !error && (
+      {!loading && !error && instances.length > 0 && (
         <div className="space-y-3">
-          {instances.map(inst => <InstanceCard key={inst.id} instance={inst} />)}
+          {instances.map(inst => (
+            <InstanceCard key={inst.id} instance={inst} />
+          ))}
         </div>
       )}
+
     </div>
   )
 }

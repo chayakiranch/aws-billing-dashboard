@@ -9,14 +9,14 @@ import SparkLine from './SparkLine'
 import HeatMap from './HeatMap'
 import BillingSummary from './BillingSummary'
 import ConnectModal from './ConnectModal'
-import PerformanceTab from './PerformanceTab'   // ← NEW
+import PerformanceTab from './PerformanceTab'
 
 export default function Dashboard() {
-  const [showModal, setShowModal] = useState(false)
+  const [showModal,   setShowModal]   = useState(false)
   const [credentials, setCredentials] = useState(null)
-  const [accountId, setAccountId] = useState(null)
-  const [months, setMonths] = useState(6)
-  const [activeTab, setActiveTab] = useState('cost')   // ← NEW
+  const [accountId,   setAccountId]   = useState(null)
+  const [months,      setMonths]      = useState(6)
+  const [activeTab,   setActiveTab]   = useState('cost')
 
   const { monthly, daily, forecast, summary,
     loading, error, isDemo } =
@@ -24,9 +24,9 @@ export default function Dashboard() {
 
   const handleConnect = (creds) => {
     setCredentials({
-      accessKeyId: creds.accessKeyId,
+      accessKeyId:     creds.accessKeyId,
       secretAccessKey: creds.secretAccessKey,
-      region: creds.region || 'us-east-1'
+      region:          creds.region || 'us-east-1'
     })
     setAccountId(creds.accountId || creds.accessKeyId.slice(0, 12))
     setShowModal(false)
@@ -70,7 +70,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-950">
 
-      {/* ── Header ──────────────────────────────────────────────── */}
+      {/* Header */}
       <header className="bg-gray-900 border-b border-gray-800 px-6 py-4
         flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
@@ -112,7 +112,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* ── Demo banner ─────────────────────────────────────────── */}
+      {/* Demo banner */}
       {isDemo && (
         <div className="bg-amber-500/10 border-b border-amber-500/20
           px-6 py-2.5 flex items-center justify-between">
@@ -129,11 +129,9 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Tab Navigation ──────────────────────────────────────── */}
+      {/* Tab Navigation */}
       <div className="bg-gray-900 border-b border-gray-800 px-6">
         <div className="flex gap-1 max-w-screen-2xl mx-auto">
-
-          {/* Cost tab */}
           <button
             onClick={() => setActiveTab('cost')}
             className={`px-4 py-3 text-xs font-medium transition-colors border-b-2 ${
@@ -144,8 +142,6 @@ export default function Dashboard() {
           >
             Cost & Billing
           </button>
-
-          {/* Performance tab ← NEW */}
           <button
             onClick={() => setActiveTab('performance')}
             className={`px-4 py-3 text-xs font-medium transition-colors border-b-2 ${
@@ -155,27 +151,25 @@ export default function Dashboard() {
             }`}
           >
             Performance
-            {/* Live pulse dot — only when on live mode */}
             {!isDemo && (
               <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse align-middle" />
             )}
           </button>
-
         </div>
       </div>
 
-      {/* ── Main Content ────────────────────────────────────────── */}
+      {/* Main Content */}
       <main className="p-6 space-y-6 max-w-screen-2xl mx-auto">
 
-        {/* Cost & Billing tab content */}
         {activeTab === 'cost' && (
           <>
             <MetricsRow monthly={monthly} forecast={forecast} />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
+                {/* FIX: removed !isDemo check — range now works in demo mode too */}
                 <TrendChart monthly={monthly}
-                  onRangeChange={(n) => { if (!isDemo) setMonths(n) }} />
+                  onRangeChange={(n) => setMonths(n)} />
               </div>
               <div><DonutChart monthly={monthly} /></div>
             </div>
@@ -193,7 +187,6 @@ export default function Dashboard() {
           </>
         )}
 
-        {/* Performance tab content ← NEW */}
         {activeTab === 'performance' && (
           <PerformanceTab />
         )}
