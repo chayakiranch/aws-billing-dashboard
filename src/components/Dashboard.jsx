@@ -10,6 +10,7 @@ import HeatMap from './HeatMap'
 import BillingSummary from './BillingSummary'
 import ConnectModal from './ConnectModal'
 import PerformanceTab from './PerformanceTab'
+import RecommendationsTab from './RecommendationsTab'  // ← NEW
 
 export default function Dashboard() {
   const [showModal,   setShowModal]   = useState(false)
@@ -155,6 +156,20 @@ export default function Dashboard() {
               <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse align-middle" />
             )}
           </button>
+
+          {/* Recommendations tab ← NEW */}
+          <button
+            onClick={() => setActiveTab('recommendations')}
+            className={`px-4 py-3 text-xs font-medium transition-colors border-b-2 ${
+              activeTab === 'recommendations'
+                ? 'border-amber-400 text-amber-400'
+                : 'border-transparent text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            Recommendations
+            <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full
+              px-1.5 py-0.5 font-mono leading-none align-middle">!</span>
+          </button>
         </div>
       </div>
 
@@ -189,6 +204,11 @@ export default function Dashboard() {
 
         {activeTab === 'performance' && (
           <PerformanceTab />
+        )}
+
+        {/* Recommendations tab content ← NEW */}
+        {activeTab === 'recommendations' && (
+          <RecommendationsTab credentials={credentials} />
         )}
 
       </main>

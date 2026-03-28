@@ -1,8 +1,9 @@
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
-const billingRoutes = require('./routes/billing')
-const performanceRoutes = require('./routes/performance')   // ← NEW
+const billingRoutes        = require('./routes/billing')
+const performanceRoutes    = require('./routes/performance')
+const recommendationRoutes = require('./routes/recommendations')  // ← NEW
 
 const app = express()
 
@@ -23,8 +24,9 @@ app.use(cors({
 
 app.use(express.json())
 
-app.use('/api/billing', billingRoutes)
-app.use('/api/performance', performanceRoutes)   // ← NEW
+app.use('/api/billing',         billingRoutes)
+app.use('/api/performance',     performanceRoutes)
+app.use('/api/recommendations', recommendationRoutes)  // ← NEW
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
