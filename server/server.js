@@ -3,7 +3,8 @@ const express = require('express')
 const cors = require('cors')
 const billingRoutes        = require('./routes/billing')
 const performanceRoutes    = require('./routes/performance')
-const recommendationRoutes = require('./routes/recommendations')  // ← NEW
+const recommendationRoutes = require('./routes/recommendations')
+const resourceRoutes       = require('./routes/resources')         // ← NEW
 
 const app = express()
 
@@ -26,7 +27,8 @@ app.use(express.json())
 
 app.use('/api/billing',         billingRoutes)
 app.use('/api/performance',     performanceRoutes)
-app.use('/api/recommendations', recommendationRoutes)  // ← NEW
+app.use('/api/recommendations', recommendationRoutes)
+app.use('/api/resources',       resourceRoutes)                    // ← NEW
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
