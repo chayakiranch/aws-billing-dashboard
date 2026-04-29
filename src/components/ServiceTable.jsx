@@ -1,5 +1,6 @@
 import { formatCurrency } from '../utils/formatCurrency'
 
+
 export default function ServiceTable({ monthly }) {
   const lastPeriod = monthly?.[monthly.length - 1]
   const services = lastPeriod?.Groups || []
@@ -7,10 +8,10 @@ export default function ServiceTable({ monthly }) {
   const sorted = [...services].sort((a, b) =>
     parseFloat(b.Metrics.UnblendedCost.Amount) -
     parseFloat(a.Metrics.UnblendedCost.Amount)
-  )
+  );
 
   const total = sorted.reduce((sum, s) =>
-    sum + parseFloat(s.Metrics.UnblendedCost.Amount), 0)
+    sum + parseFloat(s.Metrics.UnblendedCost.Amount), 0);
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">

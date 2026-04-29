@@ -10,14 +10,18 @@ import HeatMap from './HeatMap'
 import BillingSummary from './BillingSummary'
 import ConnectModal from './ConnectModal'
 import PerformanceTab from './PerformanceTab'
-import RecommendationsTab from './RecommendationsTab'  // ← NEW
+import RecommendationsTab from './RecommendationsTab'
+import ResourcesTab from './ResourcesTab'
+import FutureCostPrediction from './FutureCostPrediction'
 
 export default function Dashboard() {
-  const [showModal,   setShowModal]   = useState(false)
-  const [credentials, setCredentials] = useState(null)
-  const [accountId,   setAccountId]   = useState(null)
-  const [months,      setMonths]      = useState(6)
-  const [activeTab,   setActiveTab]   = useState('cost')
+  const [showModal,       setShowModal]       = useState(false)
+  const [credentials,     setCredentials]     = useState(null)
+  const [accountId,       setAccountId]       = useState(null)
+  const [months,          setMonths]          = useState(6)
+  const [activeTab,       setActiveTab]       = useState('cost')
+  // ── selectedPeriod: the month bar the user clicked in TrendChart ──
+  const [selectedPeriod,  setSelectedPeriod]  = useState(null)
 
   const { monthly, daily, forecast, summary,
     loading, error, isDemo } =
@@ -36,6 +40,7 @@ export default function Dashboard() {
   const handleDisconnect = () => {
     setCredentials(null)
     setAccountId(null)
+    setSelectedPeriod(null)
   }
 
   if (loading) return (
@@ -71,20 +76,23 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-950">
 
-      {/* Header */}
+      {/* ── Header ────────────────────────────────────────────────── */}
       <header className="bg-gray-900 border-b border-gray-800 px-6 py-4
         flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-orange-500 rounded-lg flex items-center
             justify-center text-white font-bold text-xs">AWS</div>
           <div>
-            <h1 className="text-white font-semibold text-sm">Billing & Cost Management</h1>
+            <h1 className="text-white font-semibold text-sm">
+              Billing & Cost Management
+            </h1>
             <p className="text-gray-500 text-xs flex items-center gap-1.5">
               {isDemo ? (
                 <><span className="w-1.5 h-1.5 bg-amber-400 rounded-full inline-block" />
                   Demo mode · connect your account for real data</>
               ) : (
-                <><span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block animate-pulse" />
+                <><span className="w-1.5 h-1.5 bg-green-400 rounded-full
+                  inline-block animate-pulse" />
                   Live · refreshed just now</>
               )}
             </p>
@@ -113,7 +121,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Demo banner */}
+      {/* ── Demo banner ───────────────────────────────────────────── */}
       {isDemo && (
         <div className="bg-amber-500/10 border-b border-amber-500/20
           px-6 py-2.5 flex items-center justify-between">
@@ -130,91 +138,131 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Tab Navigation */}
+      {/* ── Tab Navigation ────────────────────────────────────────── */}
       <div className="bg-gray-900 border-b border-gray-800 px-6">
-        <div className="flex gap-1 max-w-screen-2xl mx-auto">
-          <button
-            onClick={() => setActiveTab('cost')}
-            className={`px-4 py-3 text-xs font-medium transition-colors border-b-2 ${
-              activeTab === 'cost'
-                ? 'border-blue-400 text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            Cost & Billing
-          </button>
-          <button
-            onClick={() => setActiveTab('performance')}
-            className={`px-4 py-3 text-xs font-medium transition-colors border-b-2 ${
-              activeTab === 'performance'
-                ? 'border-teal-400 text-teal-400'
-                : 'border-transparent text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            Performance
-            {!isDemo && (
-              <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse align-middle" />
-            )}
-          </button>
+        <div className="flex gap-0 max-w-screen-2xl mx-auto overflow-x-auto">
 
-          {/* Recommendations tab ← NEW */}
-          <button
-            onClick={() => setActiveTab('recommendations')}
-            className={`px-4 py-3 text-xs font-medium transition-colors border-b-2 ${
-              activeTab === 'recommendations'
-                ? 'border-amber-400 text-amber-400'
-                : 'border-transparent text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            Recommendations
-            <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full
-              px-1.5 py-0.5 font-mono leading-none align-middle">!</span>
-          </button>
+          {[
+            { key: 'cost',            label: 'Cost & Billing',    color: 'blue'   },
+            { key: 'performance',     label: 'Performance',       color: 'teal'   },
+            { key: 'recommendations', label: 'Recommendations',   color: 'amber', badge: '!' },
+            { key: 'future',          label: 'Future Prediction', color: 'purple' },
+            { key: 'resources',       label: 'Resources',         color: 'green'  },
+          ].map(tab => (
+            <button key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-4 py-3 text-xs font-medium transition-colors
+                border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
+                activeTab === tab.key
+                  ? `border-${tab.color}-400 text-${tab.color}-400`
+                  : 'border-transparent text-gray-500 hover:text-gray-300'
+              }`}>
+              {tab.label}
+              {tab.badge && (
+                <span className="bg-red-500 text-white text-xs rounded-full
+                  px-1.5 py-0.5 font-mono leading-none">{tab.badge}</span>
+              )}
+              {tab.key === 'performance' && !isDemo && (
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-400
+                  animate-pulse inline-block" />
+              )}
+            </button>
+          ))}
+
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* ── Main Content ──────────────────────────────────────────── */}
       <main className="p-6 space-y-6 max-w-screen-2xl mx-auto">
 
+        {/* Cost & Billing */}
         {activeTab === 'cost' && (
           <>
             <MetricsRow monthly={monthly} forecast={forecast} />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
-                {/* FIX: removed !isDemo check — range now works in demo mode too */}
-                <TrendChart monthly={monthly}
-                  onRangeChange={(n) => setMonths(n)} />
+                {/* TrendChart now calls onMonthSelect when a bar is clicked */}
+                <TrendChart
+                  monthly={monthly}
+                  onRangeChange={(n) => {
+                    setMonths(n)
+                    setSelectedPeriod(null)
+                  }}
+                  onMonthSelect={(period) => setSelectedPeriod(period)}
+                />
               </div>
-              <div><DonutChart monthly={monthly} /></div>
+              {/* DonutChart receives selectedPeriod — shows that month */}
+              <div>
+                <DonutChart
+                  monthly={monthly}
+                  selectedPeriod={selectedPeriod}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2"><ServiceTable monthly={monthly} /></div>
+              <div className="lg:col-span-2">
+                <ServiceTable monthly={monthly} />
+              </div>
               <div className="space-y-6">
                 <ForecastPanel forecast={forecast} monthly={monthly} />
                 <SparkLine daily={daily} />
               </div>
             </div>
 
-            <BillingSummary summary={summary} />
+            {/* BillingSummary receives selectedPeriod — shows that month's detail */}
+            <BillingSummary
+              summary={summary}
+              monthly={monthly}
+              selectedPeriod={selectedPeriod}
+            />
+
+            {/* FutureCostPrediction in Cost tab */}
+            <FutureCostPrediction monthly={monthly} />
+
             <HeatMap />
           </>
         )}
 
-        {activeTab === 'performance' && (
-          <PerformanceTab />
-        )}
+        {/* Performance — starts in demo mode so it loads immediately */}
+        {activeTab === 'performance' && <PerformanceTab />}
 
-        {/* Recommendations tab content ← NEW */}
+        {/* Recommendations — starts in demo mode so it loads immediately */}
         {activeTab === 'recommendations' && (
           <RecommendationsTab credentials={credentials} />
+        )}
+
+        {/* Future Cost Prediction — standalone tab */}
+        {activeTab === 'future' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-white font-semibold">
+                  Future Cost Prediction
+                </h2>
+                <p className="text-gray-500 text-xs mt-0.5">
+                  6-month projection · Dijkstra service graph analysis ·
+                  rule-based cost savings
+                </p>
+              </div>
+            </div>
+            <FutureCostPrediction monthly={monthly} />
+          </div>
+        )}
+
+        {/* Resources */}
+        {activeTab === 'resources' && (
+          <ResourcesTab credentials={credentials} />
         )}
 
       </main>
 
       {showModal && (
-        <ConnectModal onClose={() => setShowModal(false)} onConnect={handleConnect} />
+        <ConnectModal
+          onClose={() => setShowModal(false)}
+          onConnect={handleConnect}
+        />
       )}
     </div>
   )

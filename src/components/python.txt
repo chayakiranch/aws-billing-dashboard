@@ -1,0 +1,1113 @@
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
+from reportlab.lib import colors
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+    PageBreak, HRFlowable, KeepTogether
+)
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+from reportlab.platypus import Flowable
+import datetime
+
+# ── Colour palette ────────────────────────────────────────────────────
+C_DARK     = colors.HexColor('#0f172a')
+C_NAVY     = colors.HexColor('#1e3a5f')
+C_BLUE     = colors.HexColor('#38bdf8')
+C_TEAL     = colors.HexColor('#2dd4bf')
+C_AMBER    = colors.HexColor('#fbbf24')
+C_GREEN    = colors.HexColor('#34d399')
+C_RED      = colors.HexColor('#f87171')
+C_PURPLE   = colors.HexColor('#a78bfa')
+C_GRAY     = colors.HexColor('#64748b')
+C_LGRAY    = colors.HexColor('#e2e8f0')
+C_WHITE    = colors.white
+C_CODEBG   = colors.HexColor('#1e293b')
+C_CODEFG   = colors.HexColor('#7dd3fc')
+
+W, H = A4
+
+# ── Styles ────────────────────────────────────────────────────────────
+styles = getSampleStyleSheet()
+
+def make_style(name, parent='Normal', **kw):
+    return ParagraphStyle(name, parent=styles[parent], **kw)
+
+s_cover_title = make_style('CoverTitle', fontSize=32, textColor=C_WHITE,
+    leading=40, alignment=TA_CENTER, spaceAfter=6, fontName='Helvetica-Bold')
+s_cover_sub   = make_style('CoverSub',   fontSize=14, textColor=C_BLUE,
+    leading=20, alignment=TA_CENTER, spaceAfter=4, fontName='Helvetica')
+s_cover_meta  = make_style('CoverMeta',  fontSize=10, textColor=C_GRAY,
+    leading=16, alignment=TA_CENTER, fontName='Helvetica')
+
+s_ch_title    = make_style('ChTitle',    fontSize=20, textColor=C_BLUE,
+    leading=26, spaceBefore=14, spaceAfter=6, fontName='Helvetica-Bold')
+s_phase_title = make_style('PhaseTitle', fontSize=15, textColor=C_TEAL,
+    leading=20, spaceBefore=10, spaceAfter=4, fontName='Helvetica-Bold')
+s_section     = make_style('Section',    fontSize=12, textColor=C_AMBER,
+    leading=16, spaceBefore=8,  spaceAfter=3, fontName='Helvetica-Bold')
+s_body        = make_style('Body',       fontSize=9,  textColor=C_DARK,
+    leading=14, spaceAfter=5,  fontName='Helvetica')
+s_body_white  = make_style('BodyW',      fontSize=9,  textColor=C_LGRAY,
+    leading=14, spaceAfter=4,  fontName='Helvetica')
+s_bullet      = make_style('Bullet',     fontSize=9,  textColor=C_DARK,
+    leading=13, spaceAfter=3,  leftIndent=14, fontName='Helvetica',
+    bulletIndent=4)
+s_code        = make_style('Code',       fontSize=7.5, textColor=C_CODEFG,
+    leading=11, fontName='Courier', backColor=C_CODEBG,
+    leftIndent=8, rightIndent=8, spaceBefore=4, spaceAfter=4)
+s_toc_entry   = make_style('TOC',        fontSize=10, textColor=C_DARK,
+    leading=18, fontName='Helvetica')
+s_note        = make_style('Note',       fontSize=8.5, textColor=C_GRAY,
+    leading=12, fontName='Helvetica-Oblique', spaceAfter=4)
+s_label       = make_style('Label',      fontSize=8,  textColor=C_WHITE,
+    leading=12, fontName='Helvetica-Bold', alignment=TA_CENTER)
+
+# ── Helper flowables ──────────────────────────────────────────────────
+class ColorBar(Flowable):
+    def __init__(self, color, height=4, width=None):
+        super().__init__()
+        self.color  = color
+        self.bh     = height
+        self.bw     = width
+    def wrap(self, aw, ah):
+        self.aw = aw
+        return (aw, self.bh + 4)
+    def draw(self):
+        w = self.bw or self.aw
+        self.canv.setFillColor(self.color)
+        self.canv.roundRect(0, 2, w, self.bh, 2, fill=1, stroke=0)
+
+class CoverBlock(Flowable):
+    def wrap(self, aw, ah): return (aw, ah)
+    def draw(self):
+        c = self.canv
+        c.setFillColor(C_DARK)
+        c.rect(0, 0, W, H, fill=1, stroke=0)
+        # gradient-like band
+        c.setFillColor(C_NAVY)
+        c.rect(0, H*0.35, W, H*0.65, fill=1, stroke=0)
+        # accent stripe
+        c.setFillColor(C_BLUE)
+        c.rect(0, H*0.35 - 4, W, 6, fill=1, stroke=0)
+        # bottom stripe
+        c.setFillColor(C_TEAL)
+        c.rect(0, 0, W, 18, fill=1, stroke=0)
+
+def hr(color=C_BLUE, thickness=0.8):
+    return HRFlowable(width='100%', thickness=thickness,
+                      color=color, spaceAfter=4, spaceBefore=2)
+
+def sp(h=6): return Spacer(1, h)
+
+def pill(text, bg=C_BLUE, fg=C_WHITE):
+    data = [[Paragraph(text, s_label)]]
+    t = Table(data, colWidths=[len(text)*5.5 + 16])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), bg),
+        ('ROUNDEDCORNERS', [4]),
+        ('TOPPADDING',  (0,0), (-1,-1), 3),
+        ('BOTTOMPADDING',(0,0),(-1,-1), 3),
+        ('LEFTPADDING', (0,0), (-1,-1), 8),
+        ('RIGHTPADDING',(0,0), (-1,-1), 8),
+    ]))
+    return t
+
+def badge_row(items):
+    """Row of coloured pills"""
+    cells = [[pill(t, c) for t, c in items]]
+    t = Table(cells, colWidths=[None]*len(items))
+    t.setStyle(TableStyle([
+        ('ALIGN',(0,0),(-1,-1),'LEFT'),
+        ('LEFTPADDING',(0,0),(-1,-1),0),
+        ('RIGHTPADDING',(0,0),(-1,-1),6),
+        ('TOPPADDING',(0,0),(-1,-1),0),
+        ('BOTTOMPADDING',(0,0),(-1,-1),0),
+    ]))
+    return t
+
+def info_table(rows, col_widths=None):
+    """Two-column key-value table"""
+    cw = col_widths or [55*mm, 95*mm]
+    data = [[Paragraph(k, make_style('TK', fontSize=8, textColor=C_GRAY,
+                fontName='Helvetica-Bold', leading=12)),
+             Paragraph(v, make_style('TV', fontSize=8, textColor=C_DARK,
+                fontName='Helvetica', leading=12))]
+            for k, v in rows]
+    t = Table(data, colWidths=cw)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (0,-1), colors.HexColor('#f1f5f9')),
+        ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+        ('ROWBACKGROUNDS', (0,0), (-1,-1),
+         [colors.HexColor('#f8fafc'), colors.white]),
+    ]))
+    return t
+
+def code_block(lines):
+    joined = '<br/>'.join(
+        line.replace('&','&amp;').replace('<','&lt;').replace('>','&gt;')
+        for line in lines
+    )
+    return Paragraph(joined, s_code)
+
+def phase_box(number, title, status, color):
+    status_col = {
+        'COMPLETE': C_GREEN,
+        'PARTIAL':  C_AMBER,
+        'NEW':      C_BLUE,
+    }.get(status, C_GRAY)
+    data = [[
+        Paragraph(f'Phase {number}', make_style(f'PNum{number}', fontSize=9,
+            textColor=C_WHITE, fontName='Helvetica-Bold', leading=12)),
+        Paragraph(title, make_style(f'PTit{number}', fontSize=11,
+            textColor=C_WHITE, fontName='Helvetica-Bold', leading=14)),
+        Paragraph(status, make_style(f'PSt{number}', fontSize=8,
+            textColor=C_WHITE, fontName='Helvetica-Bold', leading=12,
+            alignment=TA_RIGHT)),
+    ]]
+    t = Table(data, colWidths=[22*mm, 118*mm, 20*mm])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), color),
+        ('BACKGROUND', (2,0), (2,0), status_col),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 7),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 7),
+        ('LEFTPADDING', (0,0), (-1,-1), 10),
+        ('RIGHTPADDING', (0,0), (-1,-1), 10),
+        ('ROUNDEDCORNERS', [4]),
+    ]))
+    return t
+
+# ── Build document ────────────────────────────────────────────────────
+story = []
+
+# ════════════════════════════════════════════════════════════════════
+# COVER PAGE
+# ════════════════════════════════════════════════════════════════════
+story.append(CoverBlock())
+
+# We draw cover content via a table on top of the background
+cover_content = [
+    [Paragraph('AWS BILLING DASHBOARD', s_cover_title)],
+    [Paragraph('Complete Project Documentation', s_cover_sub)],
+    [sp(8)],
+    [Paragraph('Full-Stack Cloud Cost & Performance Management Platform', s_cover_sub)],
+    [sp(16)],
+    [Paragraph('React 18  ·  Node.js 18  ·  Express.js  ·  AWS SDK v3', s_cover_meta)],
+    [Paragraph('Vite 7  ·  Tailwind CSS 4  ·  Chart.js  ·  Vercel  ·  Render', s_cover_meta)],
+    [sp(24)],
+    [Paragraph(f'Generated: {datetime.date.today().strftime("%B %d, %Y")}', s_cover_meta)],
+    [Paragraph('KL University — UG Capstone Project', s_cover_meta)],
+]
+cover_table = Table(cover_content, colWidths=[W - 40*mm])
+cover_table.setStyle(TableStyle([
+    ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+    ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ('TOPPADDING', (0,0), (-1,-1), 4),
+    ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+]))
+story.append(Spacer(1, H * 0.12))
+story.append(cover_table)
+story.append(PageBreak())
+
+# ════════════════════════════════════════════════════════════════════
+# TABLE OF CONTENTS
+# ════════════════════════════════════════════════════════════════════
+story.append(Paragraph('Table of Contents', s_ch_title))
+story.append(hr())
+story.append(sp(4))
+
+toc_items = [
+    ('1.', 'Project Overview & Objectives',         '4'),
+    ('2.', 'Technology Stack',                       '5'),
+    ('3.', 'Project Architecture',                   '6'),
+    ('4.', 'Phase 7 — Performance Monitoring',       '7'),
+    ('5.', 'Phase 8 — Recommendation Engine',        '9'),
+    ('6.', 'Phase 9 — Forecasting Enhancement',      '12'),
+    ('7.', 'Phase 10 — Resources Tab',               '14'),
+    ('8.', 'Phase 11 — Integration & Bug Fixes',     '17'),
+    ('9.', 'Future Cost Prediction Module',          '19'),
+    ('10.','Deployment Guide',                       '20'),
+    ('11.','API Reference',                          '21'),
+    ('12.','IAM Policy & Security',                  '22'),
+    ('13.','File Structure',                         '23'),
+    ('14.','Key Fixes & Troubleshooting',            '24'),
+    ('15.','Phase Completion Summary',               '25'),
+]
+
+for num, title, pg in toc_items:
+    row_data = [[
+        Paragraph(num,   make_style(f'TN{num}', fontSize=9,
+            textColor=C_BLUE, fontName='Helvetica-Bold', leading=16)),
+        Paragraph(title, make_style(f'TT{num}', fontSize=9,
+            textColor=C_DARK, fontName='Helvetica', leading=16)),
+        Paragraph(pg,    make_style(f'TP{num}', fontSize=9,
+            textColor=C_GRAY, fontName='Helvetica', leading=16,
+            alignment=TA_RIGHT)),
+    ]]
+    t = Table(row_data, colWidths=[12*mm, 140*mm, 10*mm])
+    t.setStyle(TableStyle([
+        ('LINEBELOW', (0,0),(-1,-1), 0.3, colors.HexColor('#e2e8f0')),
+        ('TOPPADDING',(0,0),(-1,-1), 3),
+        ('BOTTOMPADDING',(0,0),(-1,-1), 3),
+        ('LEFTPADDING',(0,0),(-1,-1), 0),
+    ]))
+    story.append(t)
+
+story.append(PageBreak())
+
+# ════════════════════════════════════════════════════════════════════
+# 1. PROJECT OVERVIEW
+# ════════════════════════════════════════════════════════════════════
+story.append(Paragraph('1. Project Overview & Objectives', s_ch_title))
+story.append(hr())
+story.append(sp(4))
+
+story.append(Paragraph('Project Title', s_section))
+story.append(Paragraph(
+    'AWS Billing Dashboard — Cost &amp; Performance Management Platform',
+    s_body))
+story.append(sp(4))
+
+story.append(Paragraph('Description', s_section))
+story.append(Paragraph(
+    'A full-stack cloud management dashboard that connects to a real AWS account '
+    'and provides a centralised view of cloud costs, EC2 performance metrics, '
+    'resource inventory, intelligent cost recommendations, and 6-month future '
+    'cost predictions — all in one clean, dark-themed interface.',
+    s_body))
+story.append(sp(4))
+
+story.append(Paragraph('Original Project Scope (from capstone PDF)', s_section))
+story.append(Paragraph(
+    'The original project brief (Project #51 — Multi-Cloud Optimisation Platform) '
+    'required integration of AWS, Azure, and GCP. The student implemented an '
+    '<b>AWS-only</b> variant — a practical and complete full-stack application '
+    'that satisfies all five original objectives mapped to AWS services.',
+    s_body))
+story.append(sp(6))
+
+objectives = [
+    ['Original Objective',             'AWS Implementation'],
+    ['Real-time cost & usage monitoring','AWS Cost Explorer API — monthly, daily, forecast'],
+    ['Performance analysis',           'AWS CloudWatch — EC2 CPU, network, 7-day metrics'],
+    ['AI-powered optimisation',        'Rule-based engine (9 rules) + Dijkstra graph analysis'],
+    ['Centralised management dashboard','React dashboard: 5 tabs, charts, tables, cards'],
+    ['Validation with real workloads', 'Live AWS account connection + comprehensive Demo Mode'],
+]
+t = Table(objectives, colWidths=[80*mm, 80*mm])
+t.setStyle(TableStyle([
+    ('BACKGROUND', (0,0), (-1,0), C_NAVY),
+    ('TEXTCOLOR',  (0,0), (-1,0), C_WHITE),
+    ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
+    ('FONTSIZE',   (0,0), (-1,-1), 8),
+    ('GRID',       (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+    ('ROWBACKGROUNDS',(0,1),(-1,-1),
+     [colors.HexColor('#f8fafc'), colors.white]),
+    ('TOPPADDING', (0,0),(-1,-1), 5),
+    ('BOTTOMPADDING',(0,0),(-1,-1), 5),
+    ('LEFTPADDING',(0,0),(-1,-1), 6),
+    ('VALIGN',     (0,0),(-1,-1), 'TOP'),
+]))
+story.append(t)
+story.append(PageBreak())
+
+# ════════════════════════════════════════════════════════════════════
+# 2. TECH STACK
+# ════════════════════════════════════════════════════════════════════
+story.append(Paragraph('2. Technology Stack', s_ch_title))
+story.append(hr())
+story.append(sp(4))
+
+story.append(Paragraph('Frontend', s_section))
+stack_fe = [
+    ['Package',          'Version', 'Purpose'],
+    ['React',            '18.3',    'UI component framework'],
+    ['Vite',             '7.x',     'Build tool and dev server'],
+    ['Tailwind CSS',     '4.x',     'Utility-first dark-theme styling'],
+    ['Chart.js',         '4.4',     'Bar, line, doughnut, sparkline charts'],
+    ['react-chartjs-2',  '5.2',     'React wrapper for Chart.js'],
+    ['Axios',            '1.6',     'HTTP client for backend API calls'],
+    ['Lucide React',     '0.383',   'SVG icon library'],
+]
+t = Table(stack_fe, colWidths=[55*mm, 25*mm, 80*mm])
+t.setStyle(TableStyle([
+    ('BACKGROUND', (0,0), (-1,0), C_NAVY),
+    ('TEXTCOLOR',  (0,0), (-1,0), C_WHITE),
+    ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
+    ('FONTSIZE',   (0,0), (-1,-1), 8),
+    ('GRID',       (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+    ('ROWBACKGROUNDS',(0,1),(-1,-1),
+     [colors.HexColor('#f0f9ff'), colors.white]),
+    ('TOPPADDING', (0,0),(-1,-1), 4),
+    ('BOTTOMPADDING',(0,0),(-1,-1), 4),
+    ('LEFTPADDING',(0,0),(-1,-1), 6),
+]))
+story.append(t)
+story.append(sp(8))
+
+story.append(Paragraph('Backend', s_section))
+stack_be = [
+    ['Package',                        'Version', 'Purpose'],
+    ['Node.js',                        '18 LTS',  'Server runtime'],
+    ['Express.js',                     '4.18',    'HTTP routing and middleware'],
+    ['@aws-sdk/client-cost-explorer',  '3.x',     'Billing and forecast API calls'],
+    ['@aws-sdk/client-cloudwatch',     '3.x',     'EC2 performance metrics'],
+    ['@aws-sdk/client-ec2',            '3.x',     'Instance inventory'],
+    ['@aws-sdk/client-rds',            '3.x',     'RDS database listing'],
+    ['@aws-sdk/client-s3',             '3.x',     'S3 bucket listing'],
+    ['@aws-sdk/client-lambda',         '3.x',     'Lambda function listing'],
+    ['dotenv',                         '16.x',    'Environment variable loading'],
+    ['cors',                           '2.8',     'Cross-origin request control'],
+    ['nodemon',                        '3.x',     'Auto-restart during dev'],
+]
+t = Table(stack_be, colWidths=[75*mm, 20*mm, 65*mm])
+t.setStyle(TableStyle([
+    ('BACKGROUND', (0,0), (-1,0), C_NAVY),
+    ('TEXTCOLOR',  (0,0), (-1,0), C_WHITE),
+    ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
+    ('FONTSIZE',   (0,0), (-1,-1), 8),
+    ('GRID',       (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+    ('ROWBACKGROUNDS',(0,1),(-1,-1),
+     [colors.HexColor('#f0fdf4'), colors.white]),
+    ('TOPPADDING', (0,0),(-1,-1), 4),
+    ('BOTTOMPADDING',(0,0),(-1,-1), 4),
+    ('LEFTPADDING',(0,0),(-1,-1), 6),
+]))
+story.append(t)
+story.append(PageBreak())
+
+# ════════════════════════════════════════════════════════════════════
+# 3. ARCHITECTURE
+# ════════════════════════════════════════════════════════════════════
+story.append(Paragraph('3. Project Architecture', s_ch_title))
+story.append(hr())
+story.append(sp(4))
+
+story.append(Paragraph('System Architecture Flow', s_section))
+arch = [
+    ['Layer',          'Technology',           'Hosted On',   'Port'],
+    ['Frontend SPA',   'React + Vite',         'Vercel',      '443 (HTTPS)'],
+    ['Backend API',    'Node.js + Express',    'Render',      '3001'],
+    ['AWS APIs',       'AWS SDK v3',           'AWS Cloud',   'HTTPS'],
+    ['Cost Explorer',  'GetCostAndUsage etc',  'us-east-1',   'HTTPS'],
+    ['CloudWatch',     'GetMetricStatistics',  'us-east-1',   'HTTPS'],
+    ['EC2 / RDS / S3', 'Describe* / List*',   'us-east-1',   'HTTPS'],
+]
+t = Table(arch, colWidths=[45*mm, 55*mm, 45*mm, 20*mm])
+t.setStyle(TableStyle([
+    ('BACKGROUND', (0,0), (-1,0), C_NAVY),
+    ('TEXTCOLOR',  (0,0), (-1,0), C_WHITE),
+    ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
+    ('FONTSIZE',   (0,0), (-1,-1), 8),
+    ('GRID',       (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+    ('ROWBACKGROUNDS',(0,1),(-1,-1),
+     [colors.HexColor('#fefce8'), colors.white]),
+    ('TOPPADDING', (0,0),(-1,-1), 4),
+    ('BOTTOMPADDING',(0,0),(-1,-1), 4),
+    ('LEFTPADDING',(0,0),(-1,-1), 6),
+]))
+story.append(t)
+story.append(sp(8))
+
+story.append(Paragraph('Data Flow', s_section))
+story.append(Paragraph(
+    '1. User opens dashboard → React frontend (Vercel CDN)<br/>'
+    '2. Frontend sends request with AWS credentials in headers → Express backend (Render)<br/>'
+    '3. Backend uses AWS SDK v3 → calls Cost Explorer, CloudWatch, EC2 APIs<br/>'
+    '4. AWS returns JSON data → backend processes → sends to frontend<br/>'
+    '5. React renders charts, tables, cards from data<br/>'
+    '6. AWS credentials stored ONLY in server/.env — never exposed to browser',
+    s_body))
+story.append(sp(8))
+
+story.append(Paragraph('Dashboard Tabs', s_section))
+tabs = [
+    ['Tab',                  'Color',   'Content'],
+    ['Cost & Billing',       'Blue',    'MTD cost, trend chart (clickable months), donut, forecast, billing summary, future prediction'],
+    ['Performance',          'Teal',    'EC2 CPU utilisation, network in/out, idle/normal/high classification'],
+    ['Recommendations',      'Amber',   '9 rule-based findings with HIGH/MEDIUM/LOW priority and saving estimates'],
+    ['Future Prediction',    'Purple',  'Dijkstra graph, 6-month projection (3 scenarios), rule-based savings'],
+    ['Resources',            'Green',   'EC2, RDS, S3, Lambda inventory with state, region, type, details'],
+]
+t = Table(tabs, colWidths=[38*mm, 18*mm, 104*mm])
+t.setStyle(TableStyle([
+    ('BACKGROUND', (0,0), (-1,0), C_NAVY),
+    ('TEXTCOLOR',  (0,0), (-1,0), C_WHITE),
+    ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
+    ('FONTSIZE',   (0,0), (-1,-1), 8),
+    ('GRID',       (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+    ('ROWBACKGROUNDS',(0,1),(-1,-1),
+     [colors.HexColor('#fdf4ff'), colors.white]),
+    ('TOPPADDING', (0,0),(-1,-1), 4),
+    ('BOTTOMPADDING',(0,0),(-1,-1), 4),
+    ('LEFTPADDING',(0,0),(-1,-1), 6),
+    ('VALIGN',     (0,0),(-1,-1),'TOP'),
+]))
+story.append(t)
+story.append(PageBreak())
+
+# ════════════════════════════════════════════════════════════════════
+# PHASES
+# ════════════════════════════════════════════════════════════════════
+
+def phase_section(num, title, color, status, overview, steps, files, key_code=None, notes=None):
+    story.append(phase_box(num, title, status, color))
+    story.append(sp(6))
+    story.append(Paragraph('Overview', s_section))
+    story.append(Paragraph(overview, s_body))
+    story.append(sp(4))
+    story.append(Paragraph('Steps', s_section))
+    for s in steps:
+        story.append(Paragraph(f'• {s}', s_bullet))
+    story.append(sp(4))
+    if files:
+        story.append(Paragraph('Files Created / Modified', s_section))
+        file_data = [['Action', 'File', 'Location']] + files
+        ft = Table(file_data, colWidths=[22*mm, 85*mm, 55*mm])
+        ft.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), C_NAVY),
+            ('TEXTCOLOR',  (0,0), (-1,0), C_WHITE),
+            ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE',   (0,0), (-1,-1), 7.5),
+            ('GRID',       (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+            ('ROWBACKGROUNDS',(0,1),(-1,-1),
+             [colors.HexColor('#f8fafc'), colors.white]),
+            ('TOPPADDING', (0,0),(-1,-1), 4),
+            ('BOTTOMPADDING',(0,0),(-1,-1), 4),
+            ('LEFTPADDING',(0,0),(-1,-1), 5),
+            ('VALIGN',     (0,0),(-1,-1),'TOP'),
+        ]))
+        story.append(ft)
+    if key_code:
+        story.append(sp(4))
+        story.append(Paragraph('Key Code', s_section))
+        story.append(code_block(key_code))
+    if notes:
+        story.append(sp(4))
+        story.append(Paragraph('Notes', s_section))
+        for n in notes:
+            story.append(Paragraph(f'• {n}', s_bullet))
+
+# ── Phase 7 ──────────────────────────────────────────────────────────
+story.append(Paragraph('4. Phase 7 — Performance Monitoring', s_ch_title))
+story.append(hr(C_TEAL))
+story.append(sp(4))
+
+phase_section(
+    7, 'CloudWatch Performance Monitoring', C_TEAL, 'COMPLETE',
+    'Adds a Performance tab that fetches 7-day EC2 CPU utilisation and network '
+    'metrics via AWS CloudWatch. Instances are classified as Idle (CPU &lt;5%), '
+    'Normal (5–40%), or High (&gt;40%). Starts in Demo Mode by default so it '
+    'loads immediately without a backend.',
+    [
+        'Install @aws-sdk/client-cloudwatch in server/ folder',
+        'Create server/services/cloudwatch.js — getEC2Performance() with parallel metric calls',
+        'Create server/routes/performance.js — /ec2 (live) and /demo (sample data) endpoints',
+        'Register route in server/server.js: app.use("/api/performance", performanceRoutes)',
+        'Create src/components/PerformanceTab.jsx — summary bar, instance cards, mini line charts',
+        'Add IAM permissions: cloudwatch:GetMetricStatistics, cloudwatch:ListMetrics',
+        'Fix: set demoMode default to true so tab loads immediately without 404',
+    ],
+    [
+        ['CREATE', 'server/services/cloudwatch.js',   'server/services/'],
+        ['CREATE', 'server/routes/performance.js',    'server/routes/'],
+        ['MODIFY', 'server/server.js',                'server/'],
+        ['CREATE', 'src/components/PerformanceTab.jsx','src/components/'],
+    ],
+    [
+        'const [demoMode, setDemoMode] = useState(true)  // starts in demo',
+        '',
+        '// server/server.js addition:',
+        'const performanceRoutes = require("./routes/performance")',
+        'app.use("/api/performance", performanceRoutes)',
+        '',
+        '// install command:',
+        'cd server && npm install @aws-sdk/client-cloudwatch',
+    ],
+    ['404 fix: default demoMode to true, not false',
+     'Demo endpoint /api/performance/demo returns 2 sample instances',
+     'Live endpoint calls CloudWatch GetMetricStatistics in parallel per instance']
+)
+story.append(PageBreak())
+
+# ── Phase 8 ──────────────────────────────────────────────────────────
+story.append(Paragraph('5. Phase 8 — Recommendation Engine', s_ch_title))
+story.append(hr(C_AMBER))
+story.append(sp(4))
+
+phase_section(
+    8, 'Rule-Based Cost Optimisation Engine', C_AMBER, 'COMPLETE',
+    'Implements 9 rule-based cost optimisation rules that analyse billing and '
+    'CloudWatch performance data. Each finding has a priority (HIGH/MEDIUM/LOW), '
+    'a cost saving estimate, and a specific recommended action. The frontend '
+    'shows expandable cards with a filter bar.',
+    [
+        'Create server/services/recommendations.js with 9 rule functions',
+        'Create server/routes/recommendations.js with /live and /demo endpoints',
+        'Register route in server/server.js',
+        'Create src/components/RecommendationsTab.jsx with priority badges and filter',
+        'Update Dashboard.jsx to add Recommendations tab (amber colour)',
+    ],
+    [
+        ['CREATE', 'server/services/recommendations.js', 'server/services/'],
+        ['CREATE', 'server/routes/recommendations.js',   'server/routes/'],
+        ['MODIFY', 'server/server.js',                   'server/'],
+        ['CREATE', 'src/components/RecommendationsTab.jsx','src/components/'],
+        ['MODIFY', 'src/components/Dashboard.jsx',       'src/components/'],
+    ],
+    None,
+    notes=[
+        'Rule 1 (HIGH): Idle EC2 — CPU avg < 5% for 7 days',
+        'Rule 2 (HIGH): High CPU EC2 — CPU avg > 80%',
+        'Rule 3 (HIGH): Reserved Instance opportunity — EC2 avg > $200/mo',
+        'Rule 4 (HIGH): Cost spike — month-over-month growth > 20%',
+        'Rule 5 (MEDIUM): S3 lifecycle policy — S3 avg > $50/mo',
+        'Rule 6 (MEDIUM): Lambda memory optimisation — Lambda avg > $50/mo',
+        'Rule 7 (MEDIUM): EC2 dominates spend — EC2 > 70% of bill',
+        'Rule 8 (LOW): Budget alerts — total spend > $1,000/mo',
+        'Rule 9 (LOW): Compute Savings Plans — total avg > $500/mo',
+    ]
+)
+story.append(PageBreak())
+
+# ── Phase 9 ──────────────────────────────────────────────────────────
+story.append(Paragraph('6. Phase 9 — Forecasting Enhancement', s_ch_title))
+story.append(hr(C_PURPLE))
+story.append(sp(4))
+
+phase_section(
+    9, 'Enhanced Forecasting Panel (3-Window + Confidence Range)', C_PURPLE, 'COMPLETE',
+    'Completely rewrites the ForecastPanel to show three projection windows: '
+    'end of current month, 3-month cumulative, and 6-month cumulative. Each '
+    'uses AWS GetCostForecast with 80% prediction interval. Handles '
+    'DataUnavailableException gracefully with a burn-rate fallback. Updates '
+    'MOCK_FORECAST in useBillingData.js to match the new shape.',
+    [
+        'Rewrite getCostForecast() in server/services/awsBilling.js — 3 parallel safeForecast() calls',
+        'Update /forecast route in server/routes/billing.js — returns rich object not flat Amount',
+        'Update MOCK_FORECAST in src/hooks/useBillingData.js to new shape (endOfMonth, threeMonths, sixMonths, meta)',
+        'Replace src/components/ForecastPanel.jsx — clickable cards, confidence bar, MTD progress, annual run rate',
+        'DataUnavailableException handled in safeForecast() — returns null, UI shows linear fallback',
+    ],
+    [
+        ['MODIFY', 'server/services/awsBilling.js',      'server/services/'],
+        ['MODIFY', 'server/routes/billing.js',            'server/routes/'],
+        ['MODIFY', 'src/hooks/useBillingData.js',         'src/hooks/'],
+        ['REPLACE','src/components/ForecastPanel.jsx',    'src/components/'],
+    ],
+    [
+        '// New forecast shape returned by backend:',
+        '{ endOfMonth: { mean, low, high },',
+        '  threeMonths: { mean, low, high },',
+        '  sixMonths:   { mean, low, high },',
+        '  meta: { daysInMonth, dayOfMonth, daysRemaining, daysElapsed } }',
+        '',
+        '// safeForecast — never throws:',
+        'async function safeForecast(start, end) {',
+        '  try { return await client.send(new GetCostForecastCommand({...})) }',
+        '  catch (err) { console.warn(err.message); return null }',
+        '}',
+    ],
+)
+story.append(PageBreak())
+
+# ── Phase 10 ─────────────────────────────────────────────────────────
+story.append(Paragraph('7. Phase 10 — Resources Tab', s_ch_title))
+story.append(hr(C_GREEN))
+story.append(sp(4))
+
+phase_section(
+    10, 'AWS Resource Inventory (EC2, RDS, S3, Lambda)', C_GREEN, 'COMPLETE',
+    'Adds a Resources tab listing all running AWS services. Uses IAM permissions '
+    'already in the policy. Shows instance type, state, region, AZ, launch date '
+    'and service-specific details (engine, storage, endpoint, handler, code size). '
+    'Has search, service filter, and sort. Starts in Demo Mode with 11 sample resources.',
+    [
+        'Install missing SDK clients: npm install @aws-sdk/client-rds @aws-sdk/client-lambda @aws-sdk/client-s3',
+        'Create server/services/awsResources.js — getAllResources() calling 4 APIs in parallel',
+        'Create server/routes/resources.js — /live and /demo (11 sample resources) endpoints',
+        'Register route in server/server.js',
+        'Create src/components/ResourcesTab.jsx — summary bar, filter, search, sort, expandable rows',
+        'Update Dashboard.jsx to add Resources tab (green colour)',
+    ],
+    [
+        ['CREATE', 'server/services/awsResources.js',   'server/services/'],
+        ['CREATE', 'server/routes/resources.js',         'server/routes/'],
+        ['MODIFY', 'server/server.js',                   'server/'],
+        ['CREATE', 'src/components/ResourcesTab.jsx',    'src/components/'],
+        ['MODIFY', 'src/components/Dashboard.jsx',       'src/components/'],
+    ],
+    None,
+    notes=[
+        'EC2: DescribeInstances — id, name tag, type, state, AZ, public/private IP',
+        'RDS: DescribeDBInstances — id, engine, storage, Multi-AZ, endpoint',
+        'S3: ListAllMyBuckets — name, creation date (global scope)',
+        'Lambda: ListFunctions — name, runtime, memory, handler, timeout, code size',
+        'All 4 calls run in parallel via Promise.allSettled — one failure does not break others',
+    ]
+)
+story.append(PageBreak())
+
+# ── Phase 11 ─────────────────────────────────────────────────────────
+story.append(Paragraph('8. Phase 11 — Integration & Bug Fixes', s_ch_title))
+story.append(hr(C_BLUE))
+story.append(sp(4))
+
+phase_section(
+    11, 'Month Selection, 404 Fixes, DonutChart & BillingSummary', C_BLUE, 'COMPLETE',
+    'Major integration update that wires all tabs together and fixes all known bugs. '
+    'The TrendChart bar is now clickable — selecting a month updates DonutChart '
+    'and BillingSummary to show that month\'s data. Fixes 404 errors on Performance '
+    'and Recommendations tabs. Fixes demo range selection (1yr/2yr/3yr). '
+    'Adds the FutureCostPrediction component.',
+    [
+        'TrendChart: add onClick handler, highlight selected bar, broadcast via onMonthSelect prop',
+        'DonutChart: accept selectedPeriod prop, show that month\'s breakdown when selected',
+        'BillingSummary: two views — selected month detail OR all-time summary',
+        'Dashboard.jsx: add selectedPeriod state, pass to DonutChart and BillingSummary',
+        'PerformanceTab: fix 404 by setting demoMode default to true',
+        'RecommendationsTab: fix 404 by ensuring demoMode default is true',
+        'useBillingData.js: fix range buttons — remove !isDemo guard from onRangeChange',
+        'FutureCostPrediction.jsx: new component — Dijkstra graph viz + projection + savings',
+        'Dashboard.jsx: add Future Prediction tab (purple)',
+    ],
+    [
+        ['MODIFY', 'src/components/TrendChart.jsx',        'src/components/'],
+        ['MODIFY', 'src/components/DonutChart.jsx',        'src/components/'],
+        ['MODIFY', 'src/components/BillingSummary.jsx',    'src/components/'],
+        ['CREATE', 'src/components/FutureCostPrediction.jsx','src/components/'],
+        ['MODIFY', 'src/components/Dashboard.jsx',         'src/components/'],
+        ['MODIFY', 'src/hooks/useBillingData.js',          'src/hooks/'],
+    ],
+    [
+        '// Dashboard.jsx — new state:',
+        'const [selectedPeriod, setSelectedPeriod] = useState(null)',
+        '',
+        '// TrendChart — onClick broadcasts selected month:',
+        'onClick: (evt, elements) => {',
+        '  const idx = elements[0].index',
+        '  setSelectedIdx(idx)',
+        '  if (onMonthSelect) onMonthSelect(monthly[idx], idx)',
+        '}',
+        '',
+        '// DonutChart — uses selectedPeriod or last month:',
+        'const activePeriod = selectedPeriod || monthly?.[monthly.length - 1]',
+    ],
+)
+story.append(PageBreak())
+
+# ════════════════════════════════════════════════════════════════════
+# 9. FUTURE COST PREDICTION
+# ════════════════════════════════════════════════════════════════════
+story.append(Paragraph('9. Future Cost Prediction Module', s_ch_title))
+story.append(hr(C_PURPLE))
+story.append(sp(4))
+
+story.append(Paragraph('Overview', s_section))
+story.append(Paragraph(
+    'The FutureCostPrediction component appears both inside the Cost &amp; Billing tab '
+    '(bottom) and as a standalone "Future Prediction" tab. It has three sub-sections '
+    'toggled by buttons: Projection, Cost Graph, and Savings.',
+    s_body))
+story.append(sp(4))
+
+sections_fcp = [
+    ['Sub-section',   'Content'],
+    ['Projection',    '6-month line chart with 3 scenarios: Optimistic (30% savings applied), Baseline (current trend), Pessimistic (+20% overshoot). Shows avg month-over-month growth rate.'],
+    ['Cost Graph',    'SVG node-edge diagram of AWS services (Dijkstra graph). Nodes = services with costs. Edges = interaction costs. Table shows Dijkstra shortest-path results from primary compute node.'],
+    ['Savings',       'Rule-based saving suggestions with icon, priority badge, dollar saving estimate, and specific action. Same logic as Recommendations tab but filtered for forward-looking suggestions.'],
+]
+t = Table(sections_fcp, colWidths=[30*mm, 130*mm])
+t.setStyle(TableStyle([
+    ('BACKGROUND', (0,0), (-1,0), C_NAVY),
+    ('TEXTCOLOR',  (0,0), (-1,0), C_WHITE),
+    ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
+    ('FONTSIZE',   (0,0), (-1,-1), 8),
+    ('GRID',       (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+    ('ROWBACKGROUNDS',(0,1),(-1,-1),
+     [colors.HexColor('#fdf4ff'), colors.white]),
+    ('TOPPADDING', (0,0),(-1,-1), 5),
+    ('BOTTOMPADDING',(0,0),(-1,-1), 5),
+    ('LEFTPADDING',(0,0),(-1,-1), 6),
+    ('VALIGN',     (0,0),(-1,-1),'TOP'),
+]))
+story.append(t)
+story.append(sp(6))
+
+story.append(Paragraph('Dijkstra Graph Algorithm', s_section))
+story.append(Paragraph(
+    'The cost graph models AWS services as nodes (direct cost = node weight) and '
+    'their interactions as edges (data transfer, API calls = edge weight, estimated '
+    'at 3–15% of connected node costs using seeded random for consistency). '
+    'Dijkstra\'s algorithm runs from node 0 (highest-cost service) and finds the '
+    'minimum-cost path to each other service. Results are displayed as a ranked '
+    'table showing the optimal allocation path and its total monthly cost.',
+    s_body))
+story.append(PageBreak())
+
+# ════════════════════════════════════════════════════════════════════
+# 10. DEPLOYMENT
+# ════════════════════════════════════════════════════════════════════
+story.append(Paragraph('10. Deployment Guide', s_ch_title))
+story.append(hr(C_BLUE))
+story.append(sp(4))
+
+story.append(Paragraph('Backend → Render', s_section))
+deploy_be = [
+    ['Field',            'Value'],
+    ['Service type',     'Web Service'],
+    ['Root directory',   'server'],
+    ['Build command',    'npm install'],
+    ['Start command',    'node server.js'],
+    ['Instance type',    'Free ($0/month)'],
+]
+t = Table(deploy_be, colWidths=[50*mm, 110*mm])
+t.setStyle(TableStyle([
+    ('BACKGROUND', (0,0), (-1,0), C_NAVY),
+    ('TEXTCOLOR',  (0,0), (-1,0), C_WHITE),
+    ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
+    ('FONTSIZE',   (0,0), (-1,-1), 8),
+    ('GRID',       (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+    ('TOPPADDING', (0,0),(-1,-1), 4),
+    ('BOTTOMPADDING',(0,0),(-1,-1), 4),
+    ('LEFTPADDING',(0,0),(-1,-1), 6),
+]))
+story.append(t)
+story.append(sp(6))
+
+story.append(Paragraph('Render Environment Variables', s_section))
+env_be = [
+    ['Variable',               'Value'],
+    ['AWS_ACCESS_KEY_ID',      'your IAM user access key'],
+    ['AWS_SECRET_ACCESS_KEY',  'your IAM user secret key'],
+    ['AWS_REGION',             'us-east-1'],
+    ['PORT',                   '3001'],
+    ['FRONTEND_URL',           'https://your-app.vercel.app'],
+]
+t = Table(env_be, colWidths=[60*mm, 100*mm])
+t.setStyle(TableStyle([
+    ('BACKGROUND', (0,0), (-1,0), C_NAVY),
+    ('TEXTCOLOR',  (0,0), (-1,0), C_WHITE),
+    ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
+    ('FONTSIZE',   (0,0), (-1,-1), 8),
+    ('GRID',       (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+    ('ROWBACKGROUNDS',(0,1),(-1,-1),
+     [colors.HexColor('#f0fdf4'), colors.white]),
+    ('TOPPADDING', (0,0),(-1,-1), 4),
+    ('BOTTOMPADDING',(0,0),(-1,-1), 4),
+    ('LEFTPADDING',(0,0),(-1,-1), 6),
+]))
+story.append(t)
+story.append(sp(8))
+
+story.append(Paragraph('Frontend → Vercel', s_section))
+deploy_fe = [
+    ['Field',              'Value'],
+    ['Framework preset',   'Vite'],
+    ['Root directory',     './'],
+    ['Build command',      'npm run build'],
+    ['Output directory',   'dist'],
+    ['Env variable',       'VITE_API_URL = https://your-backend.onrender.com'],
+]
+t = Table(deploy_fe, colWidths=[50*mm, 110*mm])
+t.setStyle(TableStyle([
+    ('BACKGROUND', (0,0), (-1,0), C_NAVY),
+    ('TEXTCOLOR',  (0,0), (-1,0), C_WHITE),
+    ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
+    ('FONTSIZE',   (0,0), (-1,-1), 8),
+    ('GRID',       (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+    ('TOPPADDING', (0,0),(-1,-1), 4),
+    ('BOTTOMPADDING',(0,0),(-1,-1), 4),
+    ('LEFTPADDING',(0,0),(-1,-1), 6),
+]))
+story.append(t)
+story.append(PageBreak())
+
+# ════════════════════════════════════════════════════════════════════
+# 11. API REFERENCE
+# ════════════════════════════════════════════════════════════════════
+story.append(Paragraph('11. API Reference', s_ch_title))
+story.append(hr(C_BLUE))
+story.append(sp(4))
+
+api_rows = [
+    ['Method', 'Endpoint',                        'Description'],
+    ['GET',    '/api/health',                      'Server health check'],
+    ['GET',    '/api/billing/monthly?months=6',    'Monthly cost grouped by service'],
+    ['GET',    '/api/billing/daily',               'Daily cost for last 30 days'],
+    ['GET',    '/api/billing/forecast',            'End-of-month + 3mo + 6mo forecast'],
+    ['GET',    '/api/billing/summary',             'All-time totals, paid vs due'],
+    ['GET',    '/api/performance/ec2',             'Live EC2 CPU + network metrics'],
+    ['GET',    '/api/performance/demo',            'Sample performance data'],
+    ['GET',    '/api/recommendations/live',        'Live rule-based findings'],
+    ['GET',    '/api/recommendations/demo',        'Sample recommendations'],
+    ['GET',    '/api/resources/live',              'Live EC2, RDS, S3, Lambda inventory'],
+    ['GET',    '/api/resources/demo',              'Sample resource inventory (11 items)'],
+]
+t = Table(api_rows, colWidths=[15*mm, 80*mm, 65*mm])
+t.setStyle(TableStyle([
+    ('BACKGROUND', (0,0), (-1,0), C_NAVY),
+    ('TEXTCOLOR',  (0,0), (-1,0), C_WHITE),
+    ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
+    ('FONTSIZE',   (0,0), (-1,-1), 8),
+    ('GRID',       (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+    ('ROWBACKGROUNDS',(0,1),(-1,-1),
+     [colors.HexColor('#f8fafc'), colors.white]),
+    ('TOPPADDING', (0,0),(-1,-1), 4),
+    ('BOTTOMPADDING',(0,0),(-1,-1), 4),
+    ('LEFTPADDING',(0,0),(-1,-1), 6),
+    ('FONTNAME',   (0,1),(0,-1), 'Courier-Bold'),
+    ('TEXTCOLOR',  (0,1),(0,-1), C_TEAL),
+]))
+story.append(t)
+story.append(sp(6))
+
+story.append(Paragraph(
+    'All live endpoints require AWS credentials in request headers: '
+    'x-aws-access-key-id, x-aws-secret-access-key, x-aws-region',
+    s_note))
+story.append(PageBreak())
+
+# ════════════════════════════════════════════════════════════════════
+# 12. IAM POLICY
+# ════════════════════════════════════════════════════════════════════
+story.append(Paragraph('12. IAM Policy & Security', s_ch_title))
+story.append(hr(C_RED))
+story.append(sp(4))
+
+story.append(Paragraph('Complete IAM Policy JSON', s_section))
+story.append(code_block([
+    '{',
+    '  "Version": "2012-10-17",',
+    '  "Statement": [{',
+    '    "Effect": "Allow",',
+    '    "Action": [',
+    '      "ce:GetCostAndUsage",',
+    '      "ce:GetCostForecast",',
+    '      "ce:GetCostAndUsageWithResources",',
+    '      "ce:ListCostAllocationTags",',
+    '      "ec2:DescribeInstances",',
+    '      "ec2:DescribeRegions",',
+    '      "rds:DescribeDBInstances",',
+    '      "s3:ListAllMyBuckets",',
+    '      "lambda:ListFunctions",',
+    '      "cloudwatch:GetMetricStatistics",',
+    '      "cloudwatch:ListMetrics"',
+    '    ],',
+    '    "Resource": "*"',
+    '  }]',
+    '}',
+]))
+story.append(sp(6))
+
+story.append(Paragraph('Security Principles', s_section))
+for item in [
+    'AWS credentials stored ONLY in server/.env (local) and Render env vars (production)',
+    'Frontend never touches AWS keys — all AWS calls proxied through Express backend',
+    'Read-only IAM policy — no write, delete, or admin permissions granted',
+    'CORS middleware enforces strict origin allowlist — only Vercel domain permitted',
+    'server/.env is in .gitignore — never committed to version control',
+    'Credentials passed as custom headers (x-aws-*) — standard Authorization header not used',
+]:
+    story.append(Paragraph(f'• {item}', s_bullet))
+story.append(PageBreak())
+
+# ════════════════════════════════════════════════════════════════════
+# 13. FILE STRUCTURE
+# ════════════════════════════════════════════════════════════════════
+story.append(Paragraph('13. Complete File Structure', s_ch_title))
+story.append(hr(C_BLUE))
+story.append(sp(4))
+
+story.append(code_block([
+    'aws-billing-dashboard/',
+    '├── src/',
+    '│   ├── components/',
+    '│   │   ├── Dashboard.jsx          # Main layout + 5 tabs + month selection',
+    '│   │   ├── MetricsRow.jsx         # Top KPI cards (MTD, forecast, services)',
+    '│   │   ├── TrendChart.jsx         # Clickable monthly bar/line chart',
+    '│   │   ├── DonutChart.jsx         # Cost by service (responds to month click)',
+    '│   │   ├── ServiceTable.jsx       # Monthly cost per service table',
+    '│   │   ├── ForecastPanel.jsx      # 3-window forecast + confidence range',
+    '│   │   ├── SparkLine.jsx          # Daily cost sparkline',
+    '│   │   ├── HeatMap.jsx            # Daily spend heatmap',
+    '│   │   ├── BillingSummary.jsx     # All-time OR selected month summary',
+    '│   │   ├── ConnectModal.jsx       # AWS credentials input modal',
+    '│   │   ├── PerformanceTab.jsx     # EC2 CPU/network metrics',
+    '│   │   ├── RecommendationsTab.jsx # 9-rule finding cards',
+    '│   │   ├── ResourcesTab.jsx       # EC2/RDS/S3/Lambda inventory',
+    '│   │   └── FutureCostPrediction.jsx # Dijkstra graph + projections',
+    '│   ├── hooks/',
+    '│   │   └── useBillingData.js      # Data fetching + demo data generator',
+    '│   └── utils/',
+    '│       ├── formatCurrency.js      # formatCurrency, formatShort',
+    '│       └── chartSetup.js          # Chart.js global registration',
+    '├── server/',
+    '│   ├── server.js                  # Express app + 4 route registrations',
+    '│   ├── routes/',
+    '│   │   ├── billing.js             # /api/billing/* routes',
+    '│   │   ├── performance.js         # /api/performance/* routes',
+    '│   │   ├── recommendations.js     # /api/recommendations/* routes',
+    '│   │   └── resources.js           # /api/resources/* routes',
+    '│   ├── services/',
+    '│   │   ├── awsBilling.js          # Cost Explorer SDK calls',
+    '│   │   ├── cloudwatch.js          # CloudWatch + EC2 metrics',
+    '│   │   ├── recommendations.js     # 9 rule functions',
+    '│   │   └── awsResources.js        # EC2/RDS/S3/Lambda listing',
+    '│   └── .env                       # AWS keys (gitignored)',
+    '├── .gitignore',
+    '├── package.json                   # Frontend deps',
+    '├── vite.config.js',
+    '└── README.md',
+]))
+story.append(PageBreak())
+
+# ════════════════════════════════════════════════════════════════════
+# 14. TROUBLESHOOTING
+# ════════════════════════════════════════════════════════════════════
+story.append(Paragraph('14. Key Fixes & Troubleshooting', s_ch_title))
+story.append(hr(C_RED))
+story.append(sp(4))
+
+fixes = [
+    ['Error',                              'Cause',                       'Fix'],
+    ['Performance tab 404',                'demoMode default was false',   'Set useState(true) — loads demo data immediately'],
+    ['Recommendations tab 404',            'Same demoMode issue',          'Set demoMode default to true in RecommendationsTab'],
+    ['1yr/2yr/3yr buttons not working',    '!isDemo guard on onRangeChange','Remove !isDemo — call setMonths(n) always'],
+    ['MOCK_FORECAST crash',                'Old flat {Amount,Unit} shape', 'Replace with {endOfMonth,threeMonths,sixMonths,meta}'],
+    ['FutureCostPrediction import error',  'File not copied to src/components/','Copy FutureCostPrediction.jsx to src/components/'],
+    ['AccessDeniedException',              'IAM policy missing permission', 'Add missing action to inline IAM policy'],
+    ['DataUnavailableException',           'New AWS account, no history',  'safeForecast() catches and returns null; UI shows burn-rate estimate'],
+    ['CORS blocked on Render',             'FRONTEND_URL not set',         'Set FRONTEND_URL in Render env to exact Vercel URL'],
+    ['grep not found on Windows',          'grep is Linux command',        'Use PowerShell: cat file | Select-String "pattern"'],
+    ['Render service sleeping',            'Free tier spins down',         'Add /api/health keep-alive ping or upgrade tier'],
+    ['Cost chart shows $0 except one bar', 'Real AWS account with low spend','Expected — only March had charges. Demo mode shows full data'],
+]
+t = Table(fixes, colWidths=[50*mm, 55*mm, 55*mm])
+t.setStyle(TableStyle([
+    ('BACKGROUND', (0,0), (-1,0), C_NAVY),
+    ('TEXTCOLOR',  (0,0), (-1,0), C_WHITE),
+    ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
+    ('FONTSIZE',   (0,0), (-1,-1), 7.5),
+    ('GRID',       (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+    ('ROWBACKGROUNDS',(0,1),(-1,-1),
+     [colors.HexColor('#fff7ed'), colors.white]),
+    ('TOPPADDING', (0,0),(-1,-1), 4),
+    ('BOTTOMPADDING',(0,0),(-1,-1), 4),
+    ('LEFTPADDING',(0,0),(-1,-1), 5),
+    ('VALIGN',     (0,0),(-1,-1),'TOP'),
+]))
+story.append(t)
+story.append(PageBreak())
+
+# ════════════════════════════════════════════════════════════════════
+# 15. PHASE SUMMARY
+# ════════════════════════════════════════════════════════════════════
+story.append(Paragraph('15. Phase Completion Summary', s_ch_title))
+story.append(hr(C_GREEN))
+story.append(sp(4))
+
+phase_summary = [
+    ['Phase', 'Title',                          'Status',    'Est. Days', 'Key Output'],
+    ['1–6',   'Project setup, AWS, frontend base','COMPLETE','6 days',   'React app + Express backend deployed'],
+    ['7',     'Performance Monitoring',           'COMPLETE', '2 days',   'CloudWatch EC2 tab + demo mode fix'],
+    ['8',     'Recommendation Engine',            'COMPLETE', '2 days',   '9 rules, priority badges, filter'],
+    ['9',     'Forecasting Enhancement',          'COMPLETE', '1 day',    '3-window forecast + confidence range'],
+    ['10',    'Resources Tab',                    'COMPLETE', '1 day',    'EC2/RDS/S3/Lambda inventory + search'],
+    ['11',    'Integration & Bug Fixes',          'COMPLETE', '1 day',    'Month click, 404 fixes, future tab'],
+    ['12',    'Documentation & Report',           'IN PROGRESS','1 day',  'README, Chapter 5, report alignment'],
+]
+t = Table(phase_summary, colWidths=[13*mm, 52*mm, 24*mm, 18*mm, 53*mm])
+t.setStyle(TableStyle([
+    ('BACKGROUND', (0,0), (-1,0), C_NAVY),
+    ('TEXTCOLOR',  (0,0), (-1,0), C_WHITE),
+    ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
+    ('FONTSIZE',   (0,0), (-1,-1), 8),
+    ('GRID',       (0,0), (-1,-1), 0.3, colors.HexColor('#cbd5e1')),
+    ('ROWBACKGROUNDS',(0,1),(-1,-1),
+     [colors.HexColor('#f0fdf4'), colors.white]),
+    ('TEXTCOLOR',  (2,1),(2,-2), C_GREEN),
+    ('TEXTCOLOR',  (2,-1),(2,-1), C_AMBER),
+    ('FONTNAME',   (2,1),(2,-1), 'Helvetica-Bold'),
+    ('TOPPADDING', (0,0),(-1,-1), 5),
+    ('BOTTOMPADDING',(0,0),(-1,-1), 5),
+    ('LEFTPADDING',(0,0),(-1,-1), 5),
+    ('VALIGN',     (0,0),(-1,-1),'TOP'),
+]))
+story.append(t)
+story.append(sp(10))
+
+# Progress bar visual
+story.append(Paragraph('Overall Project Progress', s_section))
+story.append(sp(2))
+progress_data = [[
+    Paragraph('Phases 1–11 Complete', make_style('PB1', fontSize=8,
+        textColor=C_WHITE, fontName='Helvetica-Bold', leading=12)),
+    Paragraph('Phase 12', make_style('PB2', fontSize=8,
+        textColor=C_DARK, fontName='Helvetica-Bold', leading=12,
+        alignment=TA_CENTER)),
+]]
+pt = Table(progress_data, colWidths=[145*mm, 15*mm])
+pt.setStyle(TableStyle([
+    ('BACKGROUND', (0,0),(0,0), C_GREEN),
+    ('BACKGROUND', (1,0),(1,0), C_AMBER),
+    ('TOPPADDING', (0,0),(-1,-1), 6),
+    ('BOTTOMPADDING',(0,0),(-1,-1), 6),
+    ('LEFTPADDING',(0,0),(-1,-1), 10),
+    ('ROUNDEDCORNERS', [4]),
+]))
+story.append(pt)
+story.append(sp(4))
+story.append(Paragraph(
+    '92% complete — only Phase 12 (final documentation and report alignment) remaining.',
+    s_note))
+story.append(sp(12))
+
+story.append(hr(C_BLUE, thickness=1.5))
+story.append(sp(6))
+story.append(Paragraph(
+    'AWS Billing Dashboard — Complete Project Documentation',
+    make_style('Footer', fontSize=9, textColor=C_GRAY,
+               fontName='Helvetica', alignment=TA_CENTER, leading=14)))
+story.append(Paragraph(
+    f'KL University · UG Capstone Project · Generated {datetime.date.today().strftime("%B %d, %Y")}',
+    make_style('Footer2', fontSize=8, textColor=colors.HexColor('#94a3b8'),
+               fontName='Helvetica', alignment=TA_CENTER, leading=14)))
+
+# ── Build ─────────────────────────────────────────────────────────────
+def on_page(canvas, doc):
+    canvas.saveState()
+    # Footer line
+    canvas.setStrokeColor(colors.HexColor('#334155'))
+    canvas.setLineWidth(0.5)
+    canvas.line(20*mm, 14*mm, W - 20*mm, 14*mm)
+    # Page number
+    canvas.setFont('Helvetica', 7)
+    canvas.setFillColor(colors.HexColor('#64748b'))
+    canvas.drawRightString(W - 20*mm, 10*mm, f'Page {doc.page}')
+    canvas.drawString(20*mm, 10*mm, 'AWS Billing Dashboard — Project Documentation')
+    canvas.restoreState()
+
+def on_first_page(canvas, doc):
+    pass  # Cover page has no footer
+
+doc = SimpleDocTemplate(
+    '/home/claude/AWS_Billing_Dashboard_Documentation.pdf',
+    pagesize=A4,
+    leftMargin=20*mm, rightMargin=20*mm,
+    topMargin=18*mm, bottomMargin=22*mm,
+    title='AWS Billing Dashboard — Project Documentation',
+    author='KL University Capstone',
+)
+
+doc.build(story,
+          onFirstPage=on_first_page,
+          onLaterPages=on_page)
+
+print('PDF generated successfully.')
