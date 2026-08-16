@@ -4,7 +4,8 @@ export default function HeatMap({ values = [] }) {
     return Math.max(0.05, peak * 0.9)
   })
 
-  const data = values.length === 24 ? values : defaultValues
+  const isSimulated = values.length !== 24
+  const data = isSimulated ? defaultValues : values
 
   const getColor = (v) => {
     const opacity = 0.1 + v * 0.85
@@ -29,22 +30,36 @@ export default function HeatMap({ values = [] }) {
           </h2>
           <p className="text-xs text-gray-400 mt-0.5">Today</p>
         </div>
-        <div className="flex items-center gap-3 text-xs text-gray-400">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-blue-400
-                             inline-block" />
-            Low
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-amber-400
-                             inline-block" />
-            Medium
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-red-400
-                             inline-block" />
-            High
-          </span>
+        <div className="flex items-center gap-3">
+          {/* Not wired to real CloudWatch hourly data — this widget always
+              shows an illustrative pattern. Labeled explicitly rather than
+              silently presenting fabricated numbers as live telemetry. */}
+          {isSimulated && (
+            <span
+              title="This chart shows an illustrative usage pattern, not live CloudWatch data"
+              className="text-xs px-2 py-0.5 rounded-full border
+                         bg-amber-500/10 border-amber-500/30 text-amber-400"
+            >
+              Simulated pattern
+            </span>
+          )}
+          <div className="flex items-center gap-3 text-xs text-gray-400">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-sm bg-blue-400
+                               inline-block" />
+              Low
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-sm bg-amber-400
+                               inline-block" />
+              Medium
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-sm bg-red-400
+                               inline-block" />
+              High
+            </span>
+          </div>
         </div>
       </div>
 
@@ -55,7 +70,9 @@ export default function HeatMap({ values = [] }) {
         {data.map((v, i) => (
           <div
             key={i}
-            title={`${hours[i]} — ${Math.round(v * 100)}% utilisation`}
+            title={isSimulated
+              ? `${hours[i]} — ${Math.round(v * 100)}% (illustrative pattern, not measured)`
+              : `${hours[i]} — ${Math.round(v * 100)}% utilisation`}
             style={{
               aspectRatio: '1',
               borderRadius: '3px',

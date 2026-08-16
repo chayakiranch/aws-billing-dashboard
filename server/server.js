@@ -34,5 +34,11 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
+// Catch-all for unmatched routes — keeps API responses consistently JSON
+// instead of falling through to Express's default HTML 404 page.
+app.use((req, res) => {
+  res.status(404).json({ success: false, error: 'Not found' })
+})
+
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`))

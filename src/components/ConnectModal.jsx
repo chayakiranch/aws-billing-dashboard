@@ -58,8 +58,11 @@ export default function ConnectModal({ onClose, onConnect }) {
       setError('Secret Access Key is required')
       return
     }
-    if (!form.accessKeyId.startsWith('AKIA')) {
-      setError('Access Key ID should start with AKIA')
+    // AWS access key IDs start with a prefix identifying the credential
+    // type — AKIA for long-term IAM user keys, ASIA for temporary/STS
+    // credentials. Both are valid and should be accepted.
+    if (!/^(AKIA|ASIA)/.test(form.accessKeyId)) {
+      setError('Access Key ID should start with AKIA or ASIA')
       return
     }
     if (form.secretAccessKey.length < 30) {
@@ -148,7 +151,7 @@ export default function ConnectModal({ onClose, onConnect }) {
             onChange={handleChange('accessKeyId')}
           />
           <p className="text-xs text-gray-600 mt-1">
-            Starts with AKIA — found in IAM → Users → Security credentials
+            Starts with AKIA (standard) or ASIA (temporary) — found in IAM → Users → Security credentials
           </p>
         </div>
 

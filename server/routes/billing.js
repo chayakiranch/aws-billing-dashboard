@@ -6,6 +6,7 @@ const {
   getCostForecast,
   getBillingSummary
 } = require('../services/awsBilling')
+const { isCredentialError } = require('../utils/awsErrors')
 
 // ── Extract AWS credentials from request headers ──────────────────────
 function extractCredentials(req) {
@@ -41,12 +42,19 @@ router.get('/daily', async (req, res) => {
 
 // ── GET /api/billing/forecast ─────────────────────────────────────────
 // Enhanced: returns rich { endOfMonth, threeMonths, sixMonths, meta }
-// DataUnavailableException is handled inside the service — never crashes here
+// DataUnavailableException is handled inside the service — never crashes here.
+// Credential/auth failures are surfaced as a real error (not silently
+// success:true) so an invalid/expired account doesn't look identical to a
+// genuine "no forecast available" response.
 router.get('/forecast', async (req, res) => {
   try {
     const data = await getCostForecast(extractCredentials(req))
     res.json({ success: true, data })
   } catch (err) {
+    if (isCredentialError(err)) {
+      console.error('Forecast route auth error:', err.message)
+      return res.status(401).json({ success: false, error: 'AWS credentials required or invalid' })
+    }
     console.error('Forecast route error:', err.message)
     const now = new Date()
     res.json({

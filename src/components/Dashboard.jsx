@@ -218,9 +218,6 @@ export default function Dashboard() {
               selectedPeriod={selectedPeriod}
             />
 
-            {/* FutureCostPrediction in Cost tab */}
-            <FutureCostPrediction monthly={monthly} />
-
             <HeatMap />
           </>
         )}

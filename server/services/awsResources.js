@@ -3,6 +3,7 @@ const { EC2Client, DescribeInstancesCommand }         = require('@aws-sdk/client
 const { RDSClient, DescribeDBInstancesCommand }       = require('@aws-sdk/client-rds')
 const { S3Client, ListBucketsCommand }                = require('@aws-sdk/client-s3')
 const { LambdaClient, ListFunctionsCommand }          = require('@aws-sdk/client-lambda')
+const { isCredentialError } = require('../utils/awsErrors')
 
 function makeClients(credentials) {
   const config = credentials
@@ -48,6 +49,7 @@ async function getEC2Resources(clients) {
     }
     return instances
   } catch (err) {
+    if (isCredentialError(err)) throw err
     console.warn('EC2 fetch error:', err.message)
     return []
   }
@@ -73,6 +75,7 @@ async function getRDSResources(clients) {
       icon:        '🗄️',
     }))
   } catch (err) {
+    if (isCredentialError(err)) throw err
     console.warn('RDS fetch error:', err.message)
     return []
   }
@@ -94,6 +97,7 @@ async function getS3Resources(clients) {
       icon:       '🪣',
     }))
   } catch (err) {
+    if (isCredentialError(err)) throw err
     console.warn('S3 fetch error:', err.message)
     return []
   }
@@ -120,6 +124,7 @@ async function getLambdaResources(clients) {
       icon:        '⚡',
     }))
   } catch (err) {
+    if (isCredentialError(err)) throw err
     console.warn('Lambda fetch error:', err.message)
     return []
   }
@@ -134,6 +139,16 @@ async function getAllResources(credentials = null) {
     getS3Resources(clients),
     getLambdaResources(clients),
   ])
+
+  const settled = [ec2, rds, s3, lambda]
+  const allFailedOnCredentials = settled.every(r =>
+    r.status === 'rejected' && isCredentialError(r.reason))
+  if (allFailedOnCredentials) {
+    // Every single service failed for the same auth reason — this is a
+    // credential problem, not "an account with zero resources". Surface
+    // it as a real error rather than returning an empty-but-"success" list.
+    throw ec2.reason
+  }
 
   const all = [
     ...(ec2.status    === 'fulfilled' ? ec2.value    : []),

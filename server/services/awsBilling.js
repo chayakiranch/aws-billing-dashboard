@@ -3,6 +3,7 @@ const {
   GetCostAndUsageCommand,
   GetCostForecastCommand
 } = require('@aws-sdk/client-cost-explorer')
+const { isCredentialError } = require('../utils/awsErrors')
 
 // ── Client factory ────────────────────────────────────────────────────
 function createClient(credentials) {
@@ -143,7 +144,10 @@ async function getCostForecast(credentials = null) {
   const daysRemaining = daysInMonth - dayOfMonth
   const daysElapsed   = dayOfMonth - 1
 
-  // Safely call AWS — returns null instead of throwing
+  // Safely call AWS — returns null for genuine data-unavailable responses
+  // (e.g. DataUnavailableException for a future window), but rethrows
+  // credential/auth failures so they surface as a real error instead of
+  // silently looking like "no forecast data".
   async function safeForecast(start, end) {
     if (start >= end) return null
     try {
@@ -155,6 +159,7 @@ async function getCostForecast(credentials = null) {
       })
       return await client.send(command)
     } catch (err) {
+      if (isCredentialError(err)) throw err
       console.warn(`Forecast unavailable (${start} -> ${end}):`, err.message)
       return null
     }
@@ -236,6 +241,7 @@ async function getBillingSummary(credentials = null) {
       monthlyTotals
     }
   } catch (err) {
+    if (isCredentialError(err)) throw err
     console.error('Summary error:', err.message)
     return { totalPaid: '0.00', currentMonthDue: '0.00', currency: 'USD', monthlyTotals: [] }
   }

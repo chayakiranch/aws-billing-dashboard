@@ -265,7 +265,7 @@ function GraphViz({ nodes, edges }) {
               stroke="#334155" strokeWidth="1" strokeDasharray="4 3" />
             <text x={mx} y={my - 4} fill="#475569"
               fontSize="7" textAnchor="middle">
-              ${e.weight.toFixed(2)}/mo
+              ~${e.weight.toFixed(2)}/mo est.
             </text>
           </g>
         )
@@ -444,9 +444,25 @@ export default function FutureCostPrediction({ monthly }) {
       {activeSection === 'graph' && (
         <>
           <div className="bg-gray-800/40 rounded-xl p-3">
-            <p className="text-xs text-gray-500 mb-3">
-              AWS services modelled as a cost-weighted dependency graph.
-              Dijkstra's algorithm finds the cheapest allocation path (shown from EC2 outward).
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <p className="text-xs text-gray-500">
+                AWS services modelled as a cost-weighted dependency graph, using
+                each service's actual monthly cost as its node weight.
+                Dijkstra's algorithm finds the cheapest allocation path
+                (shown from EC2 outward).
+              </p>
+              <span
+                title="Service costs (nodes) are real, from your actual billing data. Interaction costs (the dashed edges — data transfer, API calls) are illustrative estimates, since AWS doesn't expose a real per-service-pair interaction cost via Cost Explorer."
+                className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full border
+                           bg-amber-500/10 border-amber-500/30 text-amber-400"
+              >
+                Edges estimated
+              </span>
+            </div>
+            <p className="text-xs text-gray-600 mb-3">
+              Node costs (circles) are real, from actual billing data. The
+              dashed connections between them are illustrative interaction-cost
+              estimates, not measured AWS data-transfer figures.
             </p>
             <GraphViz nodes={graph.nodes} edges={graph.edges} />
           </div>
@@ -455,7 +471,8 @@ export default function FutureCostPrediction({ monthly }) {
           {graph.paths.length > 0 && (
             <div>
               <p className="text-xs text-gray-500 mb-2">
-                Optimal cost paths from primary compute node (Dijkstra result)
+                Optimal cost paths from primary compute node (Dijkstra result
+                — includes the illustrative edge estimates noted above)
               </p>
               <div className="space-y-2">
                 {graph.paths.slice(0, 4).map((p, i) => (
