@@ -2,9 +2,21 @@ const express = require('express')
 const router = express.Router()
 const { getEC2Performance } = require('../services/cloudwatch')
 
+// FIX: mirrors extractCredentials in routes/resources.js and routes/billing.js
+// — previously this route never read the request headers at all, so Live
+// mode silently used server .env credentials instead of the connected UI account.
+function extractCredentials(req) {
+  const accessKeyId     = req.headers['x-aws-access-key-id']
+  const secretAccessKey = req.headers['x-aws-secret-access-key']
+  const region          = req.headers['x-aws-region'] || 'us-east-1'
+  if (accessKeyId && secretAccessKey)
+    return { accessKeyId, secretAccessKey, region }
+  return null
+}
+
 router.get('/ec2', async (req, res) => {
   try {
-    const data = await getEC2Performance()
+    const data = await getEC2Performance(extractCredentials(req))
     res.json({ success: true, data })
   } catch (err) {
     console.error('CloudWatch error:', err.message)

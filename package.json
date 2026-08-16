@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-ec2": "^3.1038.0",
-    "axios": "^1.6.0",
+    "axios": "^1.19.0",
     "chart.js": "^4.5.1",
     "lucide-react": "^0.383.0",
     "react": "^18.3.0",

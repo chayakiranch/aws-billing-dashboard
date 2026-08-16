@@ -226,7 +226,7 @@ export default function Dashboard() {
         )}
 
         {/* Performance — starts in demo mode so it loads immediately */}
-        {activeTab === 'performance' && <PerformanceTab />}
+        {activeTab === 'performance' && <PerformanceTab credentials={credentials} />}
 
         {/* Recommendations — starts in demo mode so it loads immediately */}
         {activeTab === 'recommendations' && (

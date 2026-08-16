@@ -35,7 +35,9 @@ export default function MetricsRow({ monthly, forecast }) {
   const mtd = lastPeriod?.Groups?.reduce((sum, g) =>
     sum + parseFloat(g.Metrics.UnblendedCost.Amount), 0) || 0
 
-  const forecastAmount = parseFloat(forecast?.Amount || 0)
+  // FIX: forecast shape is { endOfMonth: { mean, low, high }, threeMonths, sixMonths, meta }
+  // — there is no top-level `.Amount` field. Previously always evaluated to 0.
+  const forecastAmount = parseFloat(forecast?.endOfMonth?.mean || 0)
   const serviceCount = lastPeriod?.Groups?.length || 0
 
   return (

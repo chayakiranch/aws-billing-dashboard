@@ -139,7 +139,7 @@ function InstanceCard({ instance }) {
   )
 }
 
-export default function PerformanceTab() {
+export default function PerformanceTab({ credentials }) {
   const [instances, setInstances] = useState([])
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState(null)
@@ -156,7 +156,15 @@ export default function PerformanceTab() {
     setError(null)
     try {
       const endpoint = demoMode ? '/api/performance/demo' : '/api/performance/ec2'
-      const res = await axios.get(`${API}${endpoint}`)
+      // FIX: forward the connected account's credentials as headers in Live
+      // mode, matching ResourcesTab.jsx — previously this request sent no
+      // headers at all, so the backend always fell back to server .env creds.
+      const headers = (!demoMode && credentials) ? {
+        'x-aws-access-key-id':     credentials.accessKeyId,
+        'x-aws-secret-access-key': credentials.secretAccessKey,
+        'x-aws-region':            credentials.region || 'us-east-1',
+      } : {}
+      const res = await axios.get(`${API}${endpoint}`, { headers })
       setInstances(res.data.data || [])
     } catch (err) {
       setError(err.response?.data?.error || err.message)
