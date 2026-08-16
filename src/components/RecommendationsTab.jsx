@@ -109,7 +109,9 @@ export default function RecommendationsTab({ credentials }) {
   const [summary,     setSummary]     = useState(null)
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState(null)
-  const [demoMode,    setDemoMode]    = useState(true)
+  // FIX: default to Live mode if an account is already connected, instead
+  // of always starting in Demo mode regardless of global connection state.
+  const [demoMode,    setDemoMode]    = useState(!credentials)
   const [filter,      setFilter]      = useState('ALL')
 
   useEffect(() => {

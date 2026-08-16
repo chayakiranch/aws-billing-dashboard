@@ -144,8 +144,9 @@ export default function PerformanceTab({ credentials }) {
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState(null)
 
-  // ── FIX: start in demo mode by default so data loads immediately ──
-  const [demoMode, setDemoMode] = useState(true)
+  // FIX: default to Live mode if an account is already connected, instead
+  // of always starting in Demo mode regardless of global connection state.
+  const [demoMode, setDemoMode] = useState(!credentials)
 
   useEffect(() => {
     fetchPerformance()
