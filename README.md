@@ -4,6 +4,7 @@ A full-stack cost management and monitoring dashboard for AWS accounts — visua
 
 ## Live Demo
 
+
 **[aws-billing-dashboard.vercel.app](https://aws-billing-dashboard.vercel.app/)**
 
 Frontend hosted on Vercel. Backend hosted on Render.
@@ -83,19 +84,19 @@ This is a real, working implementation of Dijkstra's algorithm — not a placeho
 ## Screenshots
 
 **Cost & Billing**
-![Cost & Billing dashboard showing monthly spend trend, cost by service, and forecast](./screenshots/cost-billing.png)
+![Cost & Billing dashboard showing monthly spend trend, cost by service, and forecast](./public/screenshots/cost-billing.png)
 
 **Performance**
-![Performance monitoring tab showing EC2 CPU and network metrics](./screenshots/performance.png)
+![Performance monitoring tab showing EC2 CPU and network metrics](./public/screenshots/performance.png)
 
 **Resources**
-![Resource inventory tab listing EC2, RDS, S3, and Lambda resources](./screenshots/resources.png)
+![Resource inventory tab listing EC2, RDS, S3, and Lambda resources](./public/screenshots/resources.png)
 
 **Recommendations**
-![Cost optimization recommendations with priority breakdown](./screenshots/recommendations.png)
+![Cost optimization recommendations with priority breakdown](./public/screenshots/recommendations.png)
 
 **Future Cost Prediction**
-![Future cost prediction chart with optimistic, baseline, and pessimistic projections](./screenshots/future-prediction.png)
+![Future cost prediction chart with optimistic, baseline, and pessimistic projections](./public/screenshots/future-prediction.png)
 
 ## Getting Started
 
